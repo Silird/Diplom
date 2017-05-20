@@ -11,7 +11,7 @@ BPlusTree::~BPlusTree() {
     std::cout << "BPlusTree deleted!" << std::endl;
 }
 
-void BPlusTree::add(int value) {
+bool BPlusTree::add(short int value) {
     BPlusElement *insertNode = findElementToInsert(value);
 
     if (insertNode == nullptr) {
@@ -25,9 +25,11 @@ void BPlusTree::add(int value) {
             split(insertNode, value, nullptr);
         }
     }
+
+    return true;
 }
 
-bool BPlusTree::search(int value) {
+bool BPlusTree::search(short int value) {
     BPlusElement *current = root;
 
     while (current != nullptr) {
@@ -66,7 +68,7 @@ bool BPlusTree::search(int value) {
     return false;
 }
 
-void BPlusTree::remove(int value) {
+bool BPlusTree::remove(short int value) {
     BPlusElement *deleted = findElementToRemove(value);
 
     if (deleted != nullptr) {
@@ -150,6 +152,8 @@ void BPlusTree::remove(int value) {
             delete deleted;
         }
     }
+
+    return true;
 }
 
 void BPlusTree::print() {
@@ -227,7 +231,7 @@ void BPlusTree::print(BPlusElement *element) {
     }
 }
 
-BPlusElement* BPlusTree::findElementToInsert(int value) {
+BPlusElement* BPlusTree::findElementToInsert(short int value) {
     BPlusElement *current = root;
 
     while (current != nullptr) {
@@ -256,7 +260,7 @@ BPlusElement* BPlusTree::findElementToInsert(int value) {
     return current;
 }
 
-void BPlusTree::split(BPlusElement *target, int value, BPlusElement *link) {
+void BPlusTree::split(BPlusElement *target, short int value, BPlusElement *link) {
     BPlusElement *element2;
 
     if (target->leaf) {
@@ -447,7 +451,7 @@ void BPlusTree::addLinkToNode(BPlusElement *target, BPlusElement *link) {
 }
 
 
-BPlusElement* BPlusTree::findElementToRemove(int value) {
+BPlusElement* BPlusTree::findElementToRemove(short int value) {
     BPlusElement *current = root;
 
     while (current != nullptr) {

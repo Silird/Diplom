@@ -5,9 +5,9 @@ class ITree {
 public:
     virtual ~ITree(){};
 
-    virtual void add(int value){};
-    virtual bool search(int value){return false;};
-    virtual void remove(int value){};
+    virtual bool add(short int value){};
+    virtual bool search(short int value){return false;};
+    virtual bool remove(short int value){};
     virtual void print(){};
     virtual void printValues(){};
 };

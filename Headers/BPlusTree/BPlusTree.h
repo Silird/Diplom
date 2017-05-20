@@ -12,20 +12,20 @@ private:
 public:
     BPlusTree(int range);
     ~BPlusTree();
-    void add(int value);
-    bool search(int value);
-    void remove(int value);
+    bool add(short int value);
+    bool search(short int value);
+    bool remove(short int value);
     void print();
     void printValues();
 
 private:
     void print(BPlusElement *element);
 
-    BPlusElement* findElementToInsert(int value);
-    void split(BPlusElement *target, int value, BPlusElement *link);
+    BPlusElement* findElementToInsert(short int value);
+    void split(BPlusElement *target, short int value, BPlusElement *link);
     void addLinkToNode(BPlusElement *target, BPlusElement *link);
 
-    BPlusElement* findElementToRemove(int value);
+    BPlusElement* findElementToRemove(short int value);
     void merge(BPlusElement *node1, BPlusElement *node2);
 };
 

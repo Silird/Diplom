@@ -1,6 +1,6 @@
 #include <iostream>
 #include "../Headers/TreeFactory.h"
-#include "../Headers/BPlusTree.h"
+#include "../Headers/BPlusTree/BPlusTree.h"
 
 TreeFactory *TreeFactory::instance = nullptr;
 

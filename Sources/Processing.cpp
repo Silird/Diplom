@@ -15,7 +15,7 @@ Processing::Processing(int N, int C) {
 void Processing::start() {
     ITree *tree = TreeFactory::getInstance()->getTree();
 
-    int limit = 2;
+    int limit = 100;
     for (int i = 0; i < N/C; i++) {
         //std::cout << "Operation " << i << std::endl;
         switch (rand() % 7) {
@@ -30,9 +30,9 @@ void Processing::start() {
             case 2: {
             }
             case 3: {
-                //int number = rand() % limit;
-                //std::cout << "(" << i << ") Search " << number << std::endl;
-                //tree->search(number);
+                int number = rand() % limit;
+                std::cout << "(" << i << ") Search " << number << std::endl;
+                tree->search(number);
                 break;
             }
             default: {

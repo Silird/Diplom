@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../Headers/BPlusTree.h"
+#include "../../Headers/BPlusTree/BPlusTree.h"
 
 BPlusTree::BPlusTree(int range) {
     this->range = range;
@@ -144,6 +144,10 @@ void BPlusTree::remove(int value) {
                     merge(deleted, right);
                 }
             }
+        }
+        else if ((deleted == root) && (deleted->getDataSize() == 0)) {
+            root = nullptr;
+            delete deleted;
         }
     }
 }

@@ -1,7 +1,7 @@
 #ifndef DIPLOM_BPLUSTREE_H
 #define DIPLOM_BPLUSTREE_H
 
-#include "ITree.h"
+#include "../ITree.h"
 #include "BPlusElement.h"
 
 class BPlusTree : public virtual ITree {

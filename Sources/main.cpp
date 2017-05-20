@@ -19,14 +19,6 @@ int main(int argc, char * argv[]) {
     std::cout << "R = " << R << std::endl;
 
     Processing *processing;
-    //processing->startParallelStack();
-
-    //TestFactory::getInstance()->clear();
-
-
-
-
-/*
     for (int cores = 1; cores <= C; cores++) {
         TreeFactory::getInstance(R)->getTree();
 
@@ -36,107 +28,114 @@ int main(int argc, char * argv[]) {
 
         TreeFactory::getInstance()->clear();
     }
-*/
+
+    return 0;
+}
 
 
-    ITree *tree = TreeFactory::getInstance(R)->getTree();
-    tree->print();
 
-    tree->add(0);
+/*
 
-    tree->print();
+ITree *tree = TreeFactory::getInstance(R)->getTree();
+tree->print();
 
-    tree->remove(1);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->remove(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->remove(1);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->remove(1);
 
-    tree->print();
+tree->print();
 
-    tree->remove(0);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->remove(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->remove(1);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->remove(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(0);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->remove(0);
+tree->add(0);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->remove(0);
 
-    tree->print();
+tree->print();
 
-    tree->remove(0);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->remove(1);
+tree->remove(0);
 
-    tree->print();
+tree->print();
 
-    tree->remove(0);
+tree->remove(1);
 
-    tree->print();
+tree->print();
 
-    tree->add(1);
+tree->remove(0);
 
-    tree->print();
+tree->print();
 
-    tree->remove(1);
+tree->add(1);
 
-    tree->print();
+tree->print();
 
-    tree->remove(1);
+tree->remove(1);
 
-    tree->print();
+tree->print();
+
+tree->remove(1);
+
+
+tree->print();
+ */
 /*
     ITree *tree = TreeFactory::getInstance(R)->getTree();
 
@@ -191,6 +190,3 @@ int main(int argc, char * argv[]) {
 
     //tree->printValues();
 */
-
-    return 0;
-}

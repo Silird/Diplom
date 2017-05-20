@@ -5,5 +5,5 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(SOURCE_FILES Sources/main.cpp Headers/ITree.h Headers/BPlusTree.h Headers/BPlusElement.h Headers/TreeFactory.h Headers/Processing.h Sources/BPlusTree.cpp Sources/TreeFactory.cpp Sources/BPlusElement.cpp Sources/Processing.cpp)
+set(SOURCE_FILES Sources/main.cpp Headers/ITree.h Headers/BPlusTree/BPlusTree.h Headers/BPlusTree/BPlusElement.h Headers/TreeFactory.h Headers/Processing.h Sources/BPlusTree/BPlusTree.cpp Sources/TreeFactory.cpp Sources/BPlusTree/BPlusElement.cpp Sources/Processing.cpp)
 add_executable(Diplom ${SOURCE_FILES})

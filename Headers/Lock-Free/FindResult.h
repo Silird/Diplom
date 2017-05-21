@@ -1,0 +1,6 @@
+
+
+#ifndef DIPLOM_FINDRESULT_H
+#define DIPLOM_FINDRESULT_H
+
+#endif //DIPLOM_FINDRESULT_H

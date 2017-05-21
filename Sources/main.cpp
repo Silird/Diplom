@@ -18,6 +18,7 @@ int main(int argc, char * argv[]) {
     int R = atoi(argv[3]); // Range количество ссылок у B-дерева
     std::cout << "R = " << R << std::endl;
 
+    /*
     Processing *processing;
     for (int cores = 1; cores <= C; cores++) {
         TreeFactory::getInstance(R)->getTree();
@@ -28,6 +29,14 @@ int main(int argc, char * argv[]) {
 
         TreeFactory::getInstance()->clear();
     }
+     */
+
+    ITree *tree = TreeFactory::getInstance(R)->getTree();
+
+    tree->print();
+    tree->printValues();
+
+    TreeFactory::getInstance()->clear();
 
     return 0;
 }

@@ -5,6 +5,7 @@
 #include <vector>
 #include "../ITree.h"
 #include "LockFreeElement.h"
+#include "FindResult.h"
 
 // recovery Types
 const short int RT_COPY = 0;
@@ -22,7 +23,7 @@ class LockFreeTree : public virtual ITree {
 private:
     std::vector<LockFreeElement*> nodes;
     int MAX, MIN;
-    LockFreeElement *root;
+    std::atomic<LockFreeElement*> root;
 
 public:
     LockFreeTree(int range);
@@ -34,6 +35,9 @@ public:
     void printValues();
 
 private:
+    void print(LockFreeElement *element, int maxHeight);
+    void printValues(LockFreeElement *element);
+
     // те, которые известны
     /*
      * Находит лист, у которого ПОТЕНЦИАЛЬНО может находится данный ключ
@@ -60,7 +64,7 @@ private:
      * Находит раба для мёрджа с master
      * Устанавливет состояния у обоих узлов
      */
-    LockFreeElement* FindJoinSlave(LockFreeElement *master);
+    LockFreeElement* FindJoinSlave(LockFreeElement *master, LockFreeElement *oldSlave);
 
     /*
      * Пытается установить отношение master-slave
@@ -103,20 +107,20 @@ private:
      * Разделение корня на два целевых узла
      * У дерева получается новый корень
      */
-    void SplitRoot(LockFreeElement *root, short int sepKey, LockFreeElement *n1,
+    void SplitRoot(LockFreeElement *oldRoot, short int sepKey, LockFreeElement *n1,
                    LockFreeElement *n2);
 
     /*
      * Слияние двух узлов, так что остаётся только один корень
      */
-    void MergeRoot(LockFreeElement *root, LockFreeElement *posibleNewRoot,
+    void MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleNewRoot,
                    LockFreeElement * c1, short int c1Key);
 
     /*
      * Замена в целевом чанке записи с данным ключом на neww, но если
      * нынешнее значение равно exp
      */
-    bool ReplaceInChunk(Chunk *chunk, short int key, LockFreeElement *exp,
+    bool ReplaceInChunk(LockFreeElement *node, short int key, LockFreeElement *exp,
                         LockFreeElement *neww);
 
     /*
@@ -171,14 +175,14 @@ private:
      * Также записывает в глобальную переменные **prev и *next записи, которые идут до и после
      * cur, если бы список был упорядочен
      * Почему **prev, а не *prev:
-     * TODO
+     * Сделана структура FindResult, которая содержит результаты
      */
-    void Find(Chunk *chunk, short int key);
+    void Find(Chunk *chunk, short int key, FindResult *findResult);
 
     /*
      * Возврат нормального указателя * вместо **
      */
-    Entry* EntPrt(Entry **entry);
+    Entry* EntPtr(Entry **entry);
 
     /*
      * Поиск в данном чанке записи с ключом key
@@ -188,12 +192,12 @@ private:
     /*
      * Вставка в чанк записи, которая содержит данный ключ и данную ссылку на узел
      */
-    bool InsertToChunk(Chunk *chunk, short int key, LockFreeElement *data);
+    bool InsertToChunk(LockFreeElement *node, short int key, LockFreeElement *data);
 
     /*
      * Удаление в данном чанке записи с данным ключом
      */
-    bool DeleteInChunk(Chunk *chunk, short int key);
+    bool DeleteInChunk(LockFreeElement *node, short int key);
 
     /*
      * Выдаёт максимальный ключ в списке
@@ -204,7 +208,7 @@ private:
      * TODO Не полностью понимаю, что делаем метод
      * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
      */
-    Entry* combine(short int key, LockFreeElement *node);
+    LockFreeElement* combine(short int key, LockFreeElement *node);
 
     /*
      * Создание нового пустого узла
@@ -279,5 +283,10 @@ private:
      * в second
      */
     void moveEntryFromFirstToSecond(LockFreeElement *first, LockFreeElement *second);
+
+    /*
+     * Выдаёт запись с максимальным ключом
+     */
+    Entry* getMaxEntry(LockFreeElement *node);
 };
 #endif //DIPLOM_LOCKFREETREE_H

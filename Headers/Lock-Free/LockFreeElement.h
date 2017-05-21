@@ -22,20 +22,20 @@ struct LockFreeElement {
     Chunk *chunk;
 
     // Ссылка на узел создатель этого
-    LockFreeElement *creator;
+    std::atomic<LockFreeElement*> creator;
 
     // Ссылки на новые узлы, которые надо вставить в дерево
     // nextNew содержится если узел содержится уже в nextNew
-    LockFreeElement *neww;
-    LockFreeElement *nextNew;
+    std::atomic<LockFreeElement*> neww;
+    std::atomic<LockFreeElement*> nextNew;
 
     /*
      * TODO
      * Переменные должны быть в 32 битах
      * freezeState должно занимать 3 LSB бита у джоинБадди
      */
-    LockFreeElement *joinBuddy;
-    short int freezeState;
+    std::atomic<LockFreeElement*> joinBuddy;
+    std::atomic<short int> freezeState;
 
     LockFreeElement() {
         counter = 0;
@@ -46,10 +46,12 @@ struct LockFreeElement {
         nextNew = nullptr;
         joinBuddy = nullptr;
         freezeState = INFANT;
+        std::cout << "LockFreeElement created!" << std::endl;
     }
 
     ~LockFreeElement() {
         delete chunk;
+        std::cout << "LockFreeElement deleted!" << std::endl;
     }
 };
 

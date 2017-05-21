@@ -1,6 +1,7 @@
 #include <iostream>
 #include "../Headers/TreeFactory.h"
 #include "../Headers/BPlusTree/BPlusTree.h"
+#include "../Headers/Lock-Free/LockFreeTree.h"
 
 TreeFactory *TreeFactory::instance = nullptr;
 
@@ -24,7 +25,8 @@ TreeFactory* TreeFactory::getInstance() {
 
 ITree* TreeFactory::getTree() {
     if (tree == nullptr) {
-        tree = new BPlusTree(range);
+        //tree = new BPlusTree(range);
+        tree = new LockFreeTree(range);
     }
     return tree;
 }

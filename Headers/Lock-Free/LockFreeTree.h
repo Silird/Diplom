@@ -17,6 +17,7 @@ const short int TT_DELETE = 0;
 const short int TT_INSERT = 1;
 const short int TT_REPLACE = 2;
 const short int TT_ENSLAVE = 4;
+const short int TT_NONE = 5;
 
 
 class LockFreeTree : public virtual ITree {
@@ -124,14 +125,14 @@ private:
                         LockFreeElement *neww);
 
     /*
-     * TODO
-     * Я пока не понимаю, что делает эта функция
+     * На вход даётся чанк, у которого все записи заморожены и не должны изменяться
+     * Метод удаляет все записи, помеченнуы как удалённые (через метод Find)
+     * И вставляет все записи, которые ещё не вставлены в список но выделены
      */
     void StabilizeChunk(Chunk *chunk);
 
     /*
-     * TODO
-     * Я пока не понимаю, что делает эта функция
+     * Замораживает весь чанк, включая записи, котоыре не в списке
      */
     void MarkChunkFrozen(Chunk *chunk);
 
@@ -205,7 +206,7 @@ private:
     short int getMaxKey(LockFreeElement *node);
 
     /*
-     * TODO Не полностью понимаю, что делаем метод
+     * TODO Получает две переменные с каким-то количеством битов, объединяет их в одно машинное слово с этим пока проблемы
      * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
      */
     LockFreeElement* combine(short int key, LockFreeElement *node);
@@ -229,20 +230,30 @@ private:
      */
     int getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt);
 
-    // TODO не понятно пока что делать с этой функцией
+    /*
+     * Проверка на то заморожена ли запись
+     */
     bool isFrozen(Entry *entry);
 
-    // TODO не понятно пока что делать с этой функцией
+    /*
+     * Проверка на то удалена ли запись
+     */
     bool isDeleted(Entry *entry);
 
-    // TODO не понятно пока что делать с этой функцией
-    void InsertEntry(Chunk *chunk, Entry *e, short int key);
+    /*
+     * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
+     */
+    short int InsertEntry(Chunk *chunk, Entry *e, short int key);
 
-    // TODO не понятно пока что делать с этой функцией
-    void MarkFrozen();
+    /*
+     * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+     */
+    Entry* MarkFrozen(Entry* entry);
 
-    // TODO не понятно пока что делать с этой функцией
-    void clearFrozen();
+    /*
+     * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
+     */
+    Entry* clearFrozen(Entry* entry);
 
     /*
      * Копирует содержимое чанка oldNode в newNode
@@ -288,5 +299,42 @@ private:
      * Выдаёт запись с максимальным ключом
      */
     Entry* getMaxEntry(LockFreeElement *node);
+
+    /*
+     * Выделяет новую запись в данном чанке с данным ключом и данными
+     */
+    Entry* AllocateEntry(Chunk *chunk, short int key, LockFreeElement *data);
+
+    /*
+     * Удаляет помеченную как удалённую запись из списка
+     */
+    void RetireEntry(Entry *entry);
+
+    /*
+     * Очищает запись (присваевает ей специальный ключ)
+     */
+    bool ClearEntry(Chunk *chunk, Entry *entry);
+
+    /*
+     * Увеличивает каунтер элементов в узле
+     */
+    void IncCount(LockFreeElement *node);
+
+    /*
+     * Уменьшает каунтер элементов в узле, если не превышен порог MIN
+     */
+    bool DecCount(LockFreeElement *node);
+
+    /*
+     * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+     */
+    Entry* MarkDeleted(Entry* entry);
+
+    /*
+     * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
+     */
+    Entry* clearDeleted(Entry* entry);
 };
+
+
 #endif //DIPLOM_LOCKFREETREE_H

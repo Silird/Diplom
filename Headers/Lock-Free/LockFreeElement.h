@@ -37,10 +37,10 @@ struct LockFreeElement {
     std::atomic<LockFreeElement*> joinBuddy;
     std::atomic<short int> freezeState;
 
-    LockFreeElement() {
+    LockFreeElement(int range) {
         counter = 0;
         height = 0;
-        chunk = new Chunk();
+        chunk = new Chunk(range);
         creator = nullptr;
         neww = nullptr;
         nextNew = nullptr;

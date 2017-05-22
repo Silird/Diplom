@@ -256,7 +256,7 @@ LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeEl
     // TODO сделать нормальные сравнения с объединёнными переменными
     if ((parent->freezeState != NORMAL) && (oldSlave == nullptr)) {
         bool result;
-        Freeze(parent, 0, 0, master, nullptr , &result);
+        Freeze(parent, 0, nullptr, master, TT_NONE, &result);
         FindJoinSlave(master, slave);
     }
     if (!SetSlave(master, slave, anyKey, slave->chunk->head->next.load(std::memory_order_relaxed)->key)) {
@@ -331,7 +331,7 @@ bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, sho
                 }
             }
             bool result;
-            Freeze(slave, 0, 0, master, TT_ENSLAVE , &result);
+            Freeze(slave, 0, nullptr, master, TT_ENSLAVE , &result);
             return false;
         }
     }
@@ -479,14 +479,14 @@ void LockFreeTree::CallForUpdate(short int freezeState, LockFreeElement *node, s
     LockFreeElement *n1 = node->neww;
     LockFreeElement *n2 = node->neww.load(std::memory_order_relaxed)->nextNew;
     switch (freezeState) {
-        case COPY :
+        case COPY: {
             LockFreeElement *parent;
             Entry *nodeEnt;
             if (node == root) {
                 root.compare_exchange_weak(node, n1);
-            }
-            else if ((parent = FindParent(node->chunk->head->next.load(std::memory_order_relaxed)->key, node, &nodeEnt,
-                                          nullptr)) != nullptr) {
+            } else if (
+                    (parent = FindParent(node->chunk->head->next.load(std::memory_order_relaxed)->key, node, &nodeEnt,
+                                         nullptr)) != nullptr) {
                 ReplaceInChunk(parent, node->chunk->head->next.load(std::memory_order_relaxed)->key,
                                combine(nodeEnt->key, node), combine(nodeEnt->key, n1));
             }
@@ -500,23 +500,24 @@ void LockFreeTree::CallForUpdate(short int freezeState, LockFreeElement *node, s
             }
 
             return;
-        case SPLIT :
+        }
+        case SPLIT: {
             if (node == root) {
                 SplitRoot(node, sepKey, n1, n2);
-            }
-            else {
+            } else {
                 InsertSplitNodes(node, sepKey);
             }
             return;
-        case JOIN :
+        }
+        case JOIN: {
             if (n2 == nullptr) {
                 InsertMergeNode(node);
-            }
-            else {
+            } else {
                 InsertBorrowNodes(node, sepKey);
             }
 
             return;
+        }
         default:
             break;
     }
@@ -567,7 +568,7 @@ void LockFreeTree::helpInfant(LockFreeElement *node) {
     }
 
     switch (creatorFrSt) {
-        case COPY:
+        case COPY: {
             short int expState = INFANT;
             LockFreeElement *expJoinBuddy = nullptr;
             // TODO сделать нормальный кас в вайл вставить
@@ -577,18 +578,20 @@ void LockFreeTree::helpInfant(LockFreeElement *node) {
             }
 
             return;
-        case SPLIT:
+        }
+        case SPLIT: {
             InsertSplitNodes(creator, sepKey);
             return;
-        case JOIN:
+        }
+        case JOIN: {
             if (n2 == nullptr) {
                 InsertMergeNode(creator);
-            }
-            else {
+            } else {
                 InsertBorrowNodes(creator, sepKey);
             }
 
             return;
+        }
         default:
             break;
     }
@@ -670,19 +673,21 @@ bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, LockFree
 }
 
 /*
- * TODO
- * Я пока не понимаю, что делает эта функция
+ * На вход даётся чанк, у которого все записи заморожены и не должны изменяться
+ * Метод удаляет все записи, помеченнуы как удалённые (через метод Find)
+ * И вставляет все записи, которые ещё не вставлены в список но выделены
  */
 void LockFreeTree::StabilizeChunk(Chunk *chunk) {
-    // WTF?? short int maxKey = INF;
+    short int maxKey = INF;
     FindResult findResult;
-    // WTF?? Find(chunk, maxKey, &findResult);
+    // Удаление всех помеченных на удаление записей через файнд
+    Find(chunk, maxKey, &findResult);
     Entry *current = chunk->head->next;
     while (current != nullptr) {
         short int key = current->key;
         Entry *eNext = current->next;
-        // TODO WTF?? if ( (key != ⊥) && (!isDeleted(eNext)) )
-        if (!isDeleted(eNext)) {
+        // Вставка всех выделенных записей, которые не в списке
+        if ( (key != EMPTY) && (!isDeleted(eNext))) {
             Find(chunk, key, &findResult);
             if (findResult.cur == nullptr) {
                 InsertEntry(chunk, current, key);
@@ -693,11 +698,10 @@ void LockFreeTree::StabilizeChunk(Chunk *chunk) {
 }
 
 /*
- * TODO
- * Я пока не понимаю, что делает эта функция
+ * Замораживает весь чанк, включая записи, котоыре не в списке
  */
 void LockFreeTree::MarkChunkFrozen(Chunk *chunk) {
-
+    // TODO
 }
 
 /*
@@ -743,25 +747,29 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
     LockFreeElement *mergePartner = nullptr;
     // TODO сделать нормальные сравнения с объединёнными переменными
     switch (node->freezeState) {
-        case COPY:
+        case COPY: {
             decision = RT_COPY;
             break;
-        case SPLIT:
+        }
+        case SPLIT: {
             decision = RT_SPLIT;
             break;
-        case JOIN:
+        }
+        case JOIN: {
             decision = RT_MERGE;
             // TODO сделать нормальное присвоение с объединёнными переменнами
             mergePartner = node->joinBuddy;
             break;
-        case REQUEST_SLAVE:
+        }
+        case REQUEST_SLAVE: {
             decision = RT_MERGE;
             mergePartner = FindJoinSlave(node, nullptr);
-            if (mergePartner != nullptr ) {
+            if (mergePartner != nullptr) {
                 break;
             }
-        case SLAVE_FREEZE:
-            decision = RT_MERGE ;
+        }
+        case SLAVE_FREEZE: {
+            decision = RT_MERGE;
             // TODO сделать нормальное присвоение с объединёнными переменнами
             mergePartner = node->joinBuddy;
 
@@ -780,13 +788,14 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
                 node->joinBuddy.compare_exchange_weak(expJoinBuddy, mergePartner);
             }
             break;
-        case FREEZE:
+        }
+        case FREEZE: {
             MarkChunkFrozen(node->chunk);
             StabilizeChunk(node->chunk);
             decision = FreezeDecision(node->chunk);
 
             switch (decision) {
-                case RT_COPY:
+                case RT_COPY: {
                     expState = FREEZE;
                     expJoinBuddy = nullptr;
                     // TODO сделать нормальный кас в вайл вставить
@@ -795,7 +804,8 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
                         node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
                     }
                     break;
-                case RT_SPLIT:
+                }
+                case RT_SPLIT: {
                     expState = FREEZE;
                     expJoinBuddy = nullptr;
                     // TODO сделать нормальный кас в вайл вставить
@@ -804,7 +814,8 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
                         node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
                     }
                     break;
-                case RT_MERGE:
+                }
+                case RT_MERGE: {
                     mergePartner = FindJoinSlave(node, nullptr);
                     if (mergePartner == nullptr) {
                         mergePartner = node;
@@ -820,9 +831,11 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
                         }
                     }
                     break;
+                }
                 default:
                     break;
             }
+        }
     }
     return FreezeRecovery(node, key, expected, data, decision, mergePartner, tgr, res);
 }
@@ -849,29 +862,32 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     LockFreeElement *newNode2 = nullptr;
 
     switch (recovType) {
-        case RT_COPY:
+        case RT_COPY: {
             copyToOneChunkNode(oldNode, newNode1);
             break;
-        case RT_MERGE:
+        }
+        case RT_MERGE: {
             Entry firstEnt;
             Entry secondEnt;
-            int numberEnt = getEntNum(oldNode->chunk, &firstEnt, &secondEnt) + getEntNum(mergePartner->chunk, &firstEnt, &secondEnt);
-            if (numberEnt >= MAX ) {
+            int numberEnt = getEntNum(oldNode->chunk, &firstEnt, &secondEnt) +
+                            getEntNum(mergePartner->chunk, &firstEnt, &secondEnt);
+            if (numberEnt >= MAX) {
                 newNode2 = Allocate();
                 newNode1->nextNew = newNode2;
                 newNode2->creator = oldNode;
                 sepKey = mergeToTwoNodes(oldNode, mergePartner, newNode1, newNode2);
-            }
-            else {
+            } else {
                 mergeToOneNode(oldNode, mergePartner, newNode1);
             }
             break;
-        case RT_SPLIT:
+        }
+        case RT_SPLIT: {
             newNode2 = Allocate();
             newNode1->nextNew = newNode2;
             newNode2->creator = oldNode;
             sepKey = splitIntoTwoNodes(oldNode, newNode1, newNode2);
             break;
+        }
         default:
             break;
     }
@@ -879,7 +895,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     if ((newNode2 != nullptr) && (newNode2->height != 0)) {
         LockFreeElement *leftNode = getMaxEntry(newNode1)->data;
         // TODO сделать нормальное присвоение с объединёнными переменнами
-        short int leftState = leftNode->freezeState,*;
+        short int leftState = leftNode->freezeState;
         LockFreeElement *rightNode = newNode2->chunk->head->next.load(std::memory_order_relaxed)->data;
         // TODO сделать нормальное присвоение с объединёнными переменнами
         short int rightState = rightNode->freezeState;
@@ -989,8 +1005,7 @@ void LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
  * Возврат нормального указателя * вместо **
  */
 Entry* LockFreeTree::EntPtr(Entry **entry) {
-
-    return nullptr;
+    return *entry;
 }
 
 /*
@@ -1026,7 +1041,7 @@ short int LockFreeTree::getMaxKey(LockFreeElement *node) {
 }
 
 /*
- * TODO Не полностью понимаю, что делаем метод
+ * TODO Получает две переменные с каким-то количеством битов, объединяет их в одно машинное слово с этим пока проблемы
  * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
  */
 LockFreeElement* LockFreeTree::combine(short int key, LockFreeElement *node) {
@@ -1038,7 +1053,7 @@ LockFreeElement* LockFreeTree::combine(short int key, LockFreeElement *node) {
  * Создание нового пустого узла
  */
 LockFreeElement* LockFreeTree::Allocate() {
-    LockFreeElement *result = new LockFreeElement();
+    LockFreeElement *result = new LockFreeElement(MAX);
     nodes.push_back(result);
     return result;
 }
@@ -1062,30 +1077,40 @@ int LockFreeTree::getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt) {
     return 0;
 }
 
-// TODO не понятно пока что делать с этой функцией
+/*
+ * Проверка на то заморожена ли запись
+ */
 bool LockFreeTree::isFrozen(Entry *entry) {
 
     return false;
 }
 
-// TODO не понятно пока что делать с этой функцией
+/*
+ * Проверка на то удалена ли запись
+ */
 bool LockFreeTree::isDeleted(Entry *entry) {
 
     return false;
 }
 
-// TODO не понятно пока что делать с этой функцией
-void LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int key) {
+/*
+ * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
+ */
+short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int key) {
 
 }
 
-// TODO не понятно пока что делать с этой функцией
-void LockFreeTree::MarkFrozen() {
+/*
+ * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+ */
+Entry* LockFreeTree::MarkFrozen(Entry* entry) {
 
 }
 
-// TODO не понятно пока что делать с этой функцией
-void LockFreeTree::clearFrozen() {
+/*
+ * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
+ */
+Entry* LockFreeTree::clearFrozen(Entry* entry) {
 
 }
 
@@ -1145,6 +1170,60 @@ void LockFreeTree::moveEntryFromFirstToSecond(LockFreeElement *first, LockFreeEl
  * Выдаёт запись с максимальным ключом
  */
 Entry* LockFreeTree::getMaxEntry(LockFreeElement *node) {
+
+    return nullptr;
+}
+
+/*
+ * Выделяет новую запись в данном чанке с данным ключом и данными
+ */
+Entry* LockFreeTree::AllocateEntry(Chunk *chunk, short int key, LockFreeElement *data) {
+
+    return nullptr;
+}
+
+/*
+ * Удаляет помеченную как удалённую запись из списка
+ */
+void LockFreeTree::RetireEntry(Entry *entry) {
+
+}
+
+/*
+ * Очищает запись (присваевает ей специальный ключ)
+ */
+bool LockFreeTree::ClearEntry(Chunk *chunk, Entry *entry) {
+
+    return false;
+}
+
+/*
+ * Увеличивает каунтер элементов в узле
+ */
+void LockFreeTree::IncCount(LockFreeElement *node) {
+
+}
+
+/*
+ * Уменьшает каунтер элементов в узле, если не превышен порог MIN
+ */
+bool LockFreeTree::DecCount(LockFreeElement *node) {
+
+    return false;
+}
+
+/*
+ * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+ */
+Entry* LockFreeTree::MarkDeleted(Entry* entry) {
+
+    return nullptr;
+}
+
+/*
+ * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
+ */
+Entry* LockFreeTree::clearDeleted(Entry* entry) {
 
     return nullptr;
 }

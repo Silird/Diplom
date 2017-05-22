@@ -6,6 +6,7 @@
 class LockFreeElement;
 
 const short int INF = 32767;
+const short int EMPTY = 32766;
 
 struct Entry {
     short int key;
@@ -22,7 +23,7 @@ struct Entry {
     std::atomic<bool> deleted;
 
     Entry() {
-        key = INF;
+        key = EMPTY;
         data = nullptr;
         next = nullptr;
         frozen = false;

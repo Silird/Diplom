@@ -4,9 +4,9 @@
 #include "LockFreeElement.h"
 
 struct FindResult {
-    Entry **prev;
-    Entry *cur;
-    Entry *next;
+    std::atomic<EntryNext> *prev;
+    EntryNext cur;
+    EntryNext next;
 };
 
 #endif //DIPLOM_FINDRESULT_H

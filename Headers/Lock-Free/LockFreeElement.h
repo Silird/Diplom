@@ -15,8 +15,7 @@ const short int REQUEST_SLAVE = 6;
 const short int JOIN = 7;
 
 struct LockFreeElement {
-    // хз зачем
-    short int counter;
+    std::atomic<int> counter;
     int height = 0;
 
     // список записей, работа с которыми выполняется с помощью различных Lock-Free функций
@@ -40,7 +39,7 @@ struct LockFreeElement {
         creator = nullptr;
         neww = nullptr;
         nextNew = nullptr;
-        NodeState ns = state;
+        NodeState ns = state.load(std::memory_order_relaxed);
         ns.joinBuddy = nullptr;
         ns.freezeState = INFANT;
         std::cout << "LockFreeElement created!" << std::endl;
@@ -52,23 +51,23 @@ struct LockFreeElement {
     }
 
     unsigned short int getFreezeState() {
-        NodeState ns = state;
+        NodeState ns = state.load(std::memory_order_relaxed);
         return ns.freezeState;
     }
 
     LockFreeElement* getJoinBuddy() {
-        NodeState ns = state;
+        NodeState ns = state.load(std::memory_order_relaxed);
         return ns.joinBuddy;
     }
 
     void setFreezeState(unsigned short int freezeState) {
-        NodeState ns = state;
+        NodeState ns = state.load(std::memory_order_relaxed);
         ns.freezeState = freezeState;
         state = ns;
     }
 
     void setFreezeState(LockFreeElement *joinBuddy) {
-        NodeState ns = state;
+        NodeState ns = state.load(std::memory_order_relaxed);
         ns.joinBuddy = joinBuddy;
         state = ns;
     }

@@ -51,7 +51,7 @@ bool LockFreeTree::remove(short int key) {
 
 void LockFreeTree::print() {
     LockFreeElement *tmpRoot = root;
-    if (tmpRoot->chunk->head->getNext() == nullptr) {
+    if (tmpRoot->chunk->getHead()->getNext() == nullptr) {
         std::cout << "Tree is empty" << std::endl;
     }
     else {
@@ -62,7 +62,7 @@ void LockFreeTree::print() {
 
 void LockFreeTree::printValues() {
     LockFreeElement *tmpRoot = root;
-    if (tmpRoot->chunk->head->getNext() == nullptr) {
+    if (tmpRoot->chunk->getHead()->getNext() == nullptr) {
         std::cout << "Tree is empty" << std::endl;
     }
     else {
@@ -74,7 +74,7 @@ void LockFreeTree::printValues() {
 
 void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
     if (element != nullptr) {
-        Entry *current = element->chunk->head->getNext();
+        Entry *current = element->chunk->getHead()->getNext();
         while (current != nullptr) {
             for (int i = 0; i < maxHeight - element->height; i++) {
                 if (i == (element->height - 1)) {
@@ -99,7 +99,7 @@ void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
 
         std::cout << "|" << std::endl;
 
-        current = element->chunk->head->getNext();
+        current = element->chunk->getHead()->getNext();
         while (current != nullptr) {
             print(current->getData(), maxHeight);
 
@@ -111,7 +111,7 @@ void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
 void LockFreeTree::printValues(LockFreeElement *element) {
     if (element != nullptr) {
         if (element->height != 0) {
-            Entry *current = element->chunk->head->getNext();
+            Entry *current = element->chunk->getHead()->getNext();
             while (current != nullptr) {
                 printValues(current->getData());
 
@@ -119,7 +119,7 @@ void LockFreeTree::printValues(LockFreeElement *element) {
             }
         }
         else {
-            Entry *current = element->chunk->head->getNext();
+            Entry *current = element->chunk->getHead()->getNext();
             while (current != nullptr) {
                 std::cout << current->getKey() << " ";
 
@@ -140,7 +140,7 @@ LockFreeElement* LockFreeTree::FindLeaf(short int key) {
     while ( node->height != 0 ) {
         FindResult findResult;
         Find(node->chunk, key, &findResult);
-        node = findResult.cur->getData();
+        node = findResult.cur.next->getData();
     }
     return node;
 }
@@ -156,11 +156,11 @@ LockFreeElement* LockFreeTree::FindParent(short int key, LockFreeElement *childN
     while (node->height != 0) {
         FindResult findResult;
         Find(node->chunk, key, &findResult);
-        if (childNode == findResult.cur->getData()) {
-            *prntEnt = findResult.cur;
+        if (childNode == findResult.cur.next->getData()) {
+            *prntEnt = findResult.cur.next;
             if (slaveEnt != nullptr) {
                 if (findResult.prev == &(node->chunk->head)) {
-                    *slaveEnt = findResult.next;
+                    *slaveEnt = findResult.next.next;
                 }
                 else {
                     *slaveEnt = EntPtr(findResult.prev);
@@ -171,7 +171,7 @@ LockFreeElement* LockFreeTree::FindParent(short int key, LockFreeElement *childN
             }
             return node;
         }
-        node = findResult.cur->getData();
+        node = findResult.cur.next->getData();
     }
     return nullptr;
 }
@@ -210,7 +210,7 @@ void LockFreeTree::InsertSplitNodes(LockFreeElement *node, short int sepKey) {
  * Устанавливет состояния у обоих узлов
  */
 LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeElement *oldSlave) {
-    short int anyKey = master->chunk->head->getNext()->getKey();
+    short int anyKey = master->chunk->getHead()->getNext()->getKey();
     LockFreeElement *parent;
     Entry *masterEnt;
     Entry *slaveEnt;
@@ -238,7 +238,7 @@ LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeEl
         Freeze(parent, 0, combine(EMPTY, nullptr), combine(masterEnt->getKey(), master), TT_NONE, &result);
         FindJoinSlave(master, slave);
     }
-    if (!SetSlave(master, slave, masterEnt->getKey(), slave->chunk->head->getNext()->getKey())) {
+    if (!SetSlave(master, slave, masterEnt->getKey(), slave->chunk->getHead()->getNext()->getKey())) {
         FindJoinSlave(master, slave);
     }
 
@@ -426,9 +426,9 @@ void LockFreeTree::CallForUpdate(unsigned short int freezeState, LockFreeElement
             if (node == root) {
                 root.compare_exchange_weak(node, n1);
             }
-            else if ((parent = FindParent(node->chunk->head->getNext()->getKey(),
+            else if ((parent = FindParent(node->chunk->getHead()->getNext()->getKey(),
                                           node, &nodeEnt, nullptr)) != nullptr) {
-                ReplaceInChunk(parent, node->chunk->head->getNext()->getKey(),
+                ReplaceInChunk(parent, node->chunk->getHead()->getNext()->getKey(),
                                combine(nodeEnt->getKey(), node), combine(nodeEnt->getKey(), n1));
             }
 
@@ -561,12 +561,11 @@ void LockFreeTree::MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleN
 bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, EntryDataKey exp,
                                   EntryDataKey neww) {
     FindResult findResult;
-    Find(node->chunk, key, &findResult);
-    if (findResult.cur == nullptr) {
+    if (!Find(node->chunk, key, &findResult)) {
         return false;
     }
-    if (!findResult.cur->dataKey.compare_exchange_weak(exp, neww)) {
-        if (isFrozen(findResult.cur->dataKey)) {
+    if (!findResult.cur.next->dataKey.compare_exchange_weak(exp, neww)) {
+        if (isFrozen(findResult.cur.next->dataKey)) {
             bool result;
 
             Chunk *tmpChunk = Freeze(node, key, exp, neww, TT_REPLACE , &result);
@@ -592,11 +591,10 @@ void LockFreeTree::StabilizeChunk(Chunk *chunk) {
     for (int i = 0; i < chunk->entries.size(); i++) {
         Entry *current = chunk->entries[i];
         short int key = current->getKey();
-        Entry *eNext = current->getNext();
+        EntryNext eNext = current->next;
         // Вставка всех выделенных записей, которые не в списке
         if ((key != EMPTY) && (!isDeleted(eNext))) {
-            Find(chunk, key, &findResult);
-            if (findResult.cur == nullptr) {
+            if (!Find(chunk, key, &findResult)) {
                 InsertEntry(chunk, current, key);
             }
         }
@@ -629,7 +627,7 @@ void LockFreeTree::MarkChunkFrozen(Chunk *chunk) {
  * Выбор действия, которые надо воспроизвести с чанком, вышел ли он за пределы значений MAX и MIN
  */
 unsigned short int LockFreeTree::FreezeDecision(Chunk *chunk) {
-    Entry *e = chunk->head->getNext();
+    Entry *e = chunk->getHead()->getNext();
     int cnt = 0;
     while (clearFrozen(e) != nullptr) {
         cnt++;
@@ -791,7 +789,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
         LockFreeElement *leftNode = getMaxEntry(newNode1)->getData();
         unsigned short int leftState = leftNode->getFreezeState();
         LockFreeElement *leftJoinBuddy = leftNode->getJoinBuddy();
-        LockFreeElement *rightNode = newNode2->chunk->head->getNext()->getData();
+        LockFreeElement *rightNode = newNode2->chunk->getHead()->getNext()->getData();
         unsigned short int rightState = rightNode->getFreezeState();
         LockFreeElement *rightJoinBuddy = rightNode->getJoinBuddy();
 
@@ -873,6 +871,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
 /*
  * Поиск узла в данном чанке с ключом равному или
  * записи, ключ которой больше заданного, но минимальный среди таких
+ * Если встречает запись, помеченную на удаление, удаляет её
  * Результат должен записывать в глобальную переменную *cur,
  * что я считаю бредом, мб стоит
  * Также записывает в глобальную переменные **prev и *next записи, которые идут до и после
@@ -880,54 +879,159 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
  * Почему **prev, а не *prev:
  * Сделана структура FindResult, которая содержит результаты
  */
-void LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
-
+bool LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
+    findResult->prev = &(chunk->head);
+    findResult->cur = chunk->head;
+    while (clearFrozen(findResult->cur.next) != nullptr) {
+        if (findResult->prev->load(std::memory_order_relaxed) != findResult->cur) {
+            return Find(chunk, key, findResult);
+        }
+        findResult->next = findResult->cur.next->next;
+        if (isDeleted(findResult->next)) {
+            if (isFrozen(findResult->cur)) {
+                MarkFrozen(findResult->next);
+            }
+            if (!findResult->prev->compare_exchange_weak(findResult->cur, clearDeleted(findResult->next))) {
+                return Find(chunk, key, findResult);
+            }
+            RetireEntry(findResult->cur.next);
+            findResult->cur = clearDeleted(findResult->next);
+        }
+        else {
+            short int ckey = findResult->cur.next->getKey();
+            if (findResult->prev->load(std::memory_order_relaxed) != findResult->cur) {
+                return Find(chunk, key, findResult);
+            }
+            if (ckey >= key) {
+                return (ckey == key);
+            }
+            findResult->prev = &(findResult->cur.next->next);
+            findResult->cur = findResult->next;
+        }
+    }
+    return false;
 }
 
 /*
  * Возврат нормального указателя * вместо **
  */
-Entry* LockFreeTree::EntPtr(Entry **entry) {
-    return *entry;
+Entry* LockFreeTree::EntPtr(std::atomic<EntryNext> *entry) {
+    return entry->load(std::memory_order_relaxed).next;
 }
 
 /*
  * Поиск в данном чанке записи с ключом key
  */
 bool LockFreeTree::SearchInChunk(Chunk *chunk, short int key) {
-
-    return false;
+    FindResult findResult;
+    return Find(chunk, key, &findResult);
 }
 
 /*
  * Вставка в чанк записи, которая содержит данный ключ и данную ссылку на узел
  */
 bool LockFreeTree::InsertToChunk(LockFreeElement *node, short int key, LockFreeElement *data) {
-
-    return false;
+    Entry *current = AllocateEntry(node->chunk, key, data);
+    bool result = false;
+    while (current == nullptr) {
+        Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(key, data), TT_INSERT, &result);
+        if (chunk == nullptr) {
+            return result;
+        }
+        current = AllocateEntry(chunk, key, data);
+    }
+    unsigned  short int returnCode = InsertEntry(node->chunk, current, key);
+    switch (returnCode) {
+        case IC_SUCCESS_THIS: {
+            IncCount(node);
+            result = true;
+            break;
+        }
+        case IC_SUCCESS_OTHER: {
+            result = true;
+            break;
+        }
+        case IC_EXISTED: {
+            result = !ClearEntry(node, current);
+            break;
+        }
+        default:
+            break;
+    }
+    return result;
 }
 
 /*
  * Удаление в данном чанке записи с данным ключом
  */
 bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
+    while (!DecCount(node)) {
+        bool result;
+        Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
+        if (chunk == nullptr) {
+            return result;
+        }
+    }
+    while (true) {
+        FindResult findResult;
+        if (!Find(node->chunk, key, &findResult)) {
+            IncCount(node);
+            return false;
+        }
+        EntryNext clearedNext;
+        clearedNext.next = clearFrozen(clearDeleted(findResult.next).next);
+        clearedNext.freeze = false;
+        clearedNext.deletee = false;
 
-    return false;
+        if (!findResult.cur.next->next.compare_exchange_weak(clearedNext, MarkDeleted(clearedNext))) {
+            if (isFrozen(findResult.cur.next->next)) {
+                IncCount(node);
+                bool result;
+                Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
+                if (chunk == nullptr) {
+                    return result;
+                }
+                return DeleteInChunk(node, key);
+            }
+            else {
+                continue;
+            }
+        }
+        if (isFrozen(findResult.next)) {
+            MarkFrozen(findResult.next);
+        }
+        if (findResult.prev->compare_exchange_weak(findResult.cur, findResult.next)) {
+            RetireEntry(findResult.next.next);
+        }
+        else {
+            Find(node->chunk, key, &findResult);
+        }
+        return true;
+    }
 }
 
 /*
  * Выдаёт максимальный ключ в списке
  */
 short int LockFreeTree::getMaxKey(LockFreeElement *node) {
+    Entry *current = node->chunk->getHead()->getNext();
+    while (current->getNext() != nullptr) {
+        current = current->getNext();
+    }
 
-    return 0;
+    return current->getKey();
 }
 
 /*
  * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
  */
 EntryDataKey LockFreeTree::combine(short int key, LockFreeElement *node) {
+    EntryDataKey dataKey;
+    dataKey.data = node;
+    dataKey.key = key;
+    dataKey.freeze = false;
 
+    return dataKey;
 }
 
 /*
@@ -944,7 +1048,8 @@ LockFreeElement* LockFreeTree::Allocate() {
  */
 void LockFreeTree::addRootSons(LockFreeElement *root, short int sepKey1, LockFreeElement *n1,
                  short int sepKey2, LockFreeElement *n2) {
-
+    InsertToChunk(root, sepKey1, n1);
+    InsertToChunk(root, sepKey2, n2);
 }
 
 /*
@@ -954,69 +1059,122 @@ void LockFreeTree::addRootSons(LockFreeElement *root, short int sepKey1, LockFre
  * Если рассматривать список как упорядочный
  */
 int LockFreeTree::getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt) {
+    int counter = 0;
+    Entry *current = chunk->getHead()->getNext();
+    firstEnt = current;
+    secondEnt = nullptr;
+    while (current->getNext() != nullptr) {
+        if (counter == 1) {
+            secondEnt = current;
+        }
+        counter++;
+    }
 
-    return 0;
+    return counter;
 }
 
 /*
  * Проверка на то заморожена ли запись
  */
 bool LockFreeTree::isFrozen(EntryDataKey dataKey) {
-
-    return false;
+    return dataKey.freeze;
 }
 
 /*
  * Проверка на то заморожена ли запись
  */
 bool LockFreeTree::isFrozen(EntryNext dataKey) {
-
-    return false;
+    return dataKey.freeze;
 }
 
 /*
  * Проверка на то удалена ли запись
  */
-bool LockFreeTree::isDeleted(Entry *entry) {
-
-    return false;
+bool LockFreeTree::isDeleted(EntryNext entry) {
+    return entry.deletee;
 }
 
 /*
  * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
  */
 unsigned short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int key) {
-
-    return 0;
+    while (true) {
+        EntryNext savedNext = e->next;
+        FindResult findResult;
+        if (Find(chunk, key, &findResult)) {
+            if (e == findResult.cur.next) {
+                return IC_SUCCESS_OTHER;
+            }
+            else {
+                return IC_EXISTED;
+            }
+        }
+        if (isFrozen(savedNext)) {
+            // TODO ???
+            MarkFrozen(findResult.cur.next->dataKey);
+        }
+        if (isFrozen(findResult.cur.next->dataKey)) {
+            MarkFrozen(e->dataKey);
+        }
+        EntryNext entryNext;
+        entryNext.next = findResult.cur.next;
+        entryNext.freeze = false;
+        entryNext.deletee = false;
+        if (!e->next.compare_exchange_weak(savedNext, entryNext)) {
+            continue;
+        }
+        entryNext.next = e;
+        entryNext.freeze = false;
+        entryNext.deletee = false;
+        if (!findResult.prev->compare_exchange_weak(findResult.cur, entryNext)) {
+            continue;
+        }
+        return IC_SUCCESS_THIS;
+    }
 }
 
 /*
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryDataKey LockFreeTree::MarkFrozen(EntryDataKey dataKey) {
-
+    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
+    dataKey.freeze = true;
+    return dataKey;
 }
 
 /*
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryNext LockFreeTree::MarkFrozen(EntryNext next) {
-
+    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
+    next.freeze = true;
+    return next;
 }
 
 /*
  * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
  */
 Entry* LockFreeTree::clearFrozen(Entry* entry) {
+    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    EntryDataKey dataKey = entry->dataKey;
+    dataKey.freeze = false;
+    entry->dataKey = dataKey;
 
-    return nullptr;
+    EntryNext next = entry->next;
+    next.freeze = false;
+    entry->next = next;
+
+    return entry;
 }
 
 /*
  * Копирует содержимое чанка oldNode в newNode
  */
 void LockFreeTree::copyToOneChunkNode(LockFreeElement *oldNode, LockFreeElement* newNode) {
-
+    // TODO
 }
 
 /*
@@ -1032,7 +1190,7 @@ void LockFreeTree::copyToOneChunkNode(LockFreeElement *oldNode, LockFreeElement*
  */
 short int LockFreeTree::mergeToTwoNodes(LockFreeElement *oldNode, LockFreeElement *mergePartner,
                           LockFreeElement *newNode1, LockFreeElement *newNode2) {
-
+    // TODO
     return 0;
 }
 
@@ -1041,7 +1199,7 @@ short int LockFreeTree::mergeToTwoNodes(LockFreeElement *oldNode, LockFreeElemen
  */
 void LockFreeTree::mergeToOneNode(LockFreeElement *oldNode, LockFreeElement *mergePartner,
                     LockFreeElement *newNode) {
-
+    // TODO
 }
 
 /*
@@ -1052,7 +1210,7 @@ void LockFreeTree::mergeToOneNode(LockFreeElement *oldNode, LockFreeElement *mer
  */
 short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElement *newNode1,
                             LockFreeElement *newNode2) {
-
+    // TODO
     return 0;
 }
 
@@ -1061,22 +1219,35 @@ short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElem
  * в second
  */
 void LockFreeTree::moveEntryFromFirstToSecond(LockFreeElement *first, LockFreeElement *second) {
-
+    // TODO
 }
 
 /*
  * Выдаёт запись с максимальным ключом
  */
 Entry* LockFreeTree::getMaxEntry(LockFreeElement *node) {
+    Entry *current = node->chunk->getHead()->getNext();
+    while (current->getNext() != nullptr) {
+        current = current->getNext();
+    }
 
-    return nullptr;
+    return current;
 }
 
 /*
  * Выделяет новую запись в данном чанке с данным ключом и данными
  */
 Entry* LockFreeTree::AllocateEntry(Chunk *chunk, short int key, LockFreeElement *data) {
-
+    EntryDataKey keyData = combine(key, data);
+    EntryDataKey expecEnt = combine(EMPTY, nullptr);
+    for (int i = 0; i < chunk->entries.size(); i++) {
+        Entry *current = chunk->entries[i];
+        if (current->dataKey.load(std::memory_order_relaxed) == expecEnt) {
+            if (current->dataKey.compare_exchange_weak(expecEnt, keyData)) {
+                return current;
+            }
+        }
+    }
     return nullptr;
 }
 
@@ -1084,42 +1255,77 @@ Entry* LockFreeTree::AllocateEntry(Chunk *chunk, short int key, LockFreeElement 
  * Удаляет помеченную как удалённую запись из списка
  */
 void LockFreeTree::RetireEntry(Entry *entry) {
-
+    // TODO
 }
 
 /*
  * Очищает запись (присваевает ей специальный ключ)
  */
-bool LockFreeTree::ClearEntry(Chunk *chunk, Entry *entry) {
-
-    return false;
+bool LockFreeTree::ClearEntry(LockFreeElement *node, Entry *entry) {
+    EntryDataKey savedKeyData = clearFrozen(entry)->dataKey;
+    EntryNext savedNext = clearFrozen(entry)->next;
+    EntryDataKey newKeyData = combine(EMPTY, nullptr);
+    EntryNext newNext;
+    newNext.next = nullptr;
+    newNext.freeze = false;
+    newNext.deletee = false;
+    if (entry->next.compare_exchange_weak(savedNext, newNext)) {
+        if (entry->dataKey.compare_exchange_weak(savedKeyData, newKeyData)) {
+            return true;
+        }
+    }
+    bool result;
+    Freeze(node, EMPTY, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_NONE, &result);
+    FindResult findResult;
+    if (Find(node->chunk, entry->getKey(), &findResult)) {
+        if (entry == findResult.cur.next) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /*
  * Увеличивает каунтер элементов в узле
  */
 void LockFreeTree::IncCount(LockFreeElement *node) {
-
+    while (true) {
+        int counter = node->counter;
+        if (node->counter.compare_exchange_weak(counter, counter + 1)) {
+            return;
+        }
+    }
 }
 
 /*
  * Уменьшает каунтер элементов в узле, если не превышен порог MIN
  */
 bool LockFreeTree::DecCount(LockFreeElement *node) {
-
-    return false;
+    while (true) {
+        int counter = node->counter;
+        if (counter == MIN) {
+            return false;
+        }
+        if (node->counter.compare_exchange_weak(counter, counter - 1)) {
+            return true;
+        }
+    }
 }
 
 /*
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryNext LockFreeTree::MarkDeleted(EntryNext next) {
-
+    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
+    next.deletee = true;
+    return next;
 }
 
 /*
  * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
  */
-EntryNext LockFreeTree::clearDeleted(EntryNext entry) {
-
+EntryNext LockFreeTree::clearDeleted(EntryNext next) {
+    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
+    next.deletee = false;
+    return next;
 }

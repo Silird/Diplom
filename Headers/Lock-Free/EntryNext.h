@@ -9,6 +9,14 @@ struct EntryNext {
     bool deletee : 1;
     Entry *next;
 
+    bool operator == (const EntryNext &next) {
+        return ((freeze == next.freeze) && (deletee == next.deletee) && (this->next == next.next));
+    }
+
+    bool operator != (const EntryNext &next) {
+        return !((freeze == next.freeze) && (deletee == next.deletee) && (this->next == next.next));
+    }
+
     /*
     EntryDataKey() noexcept : data(nullptr), key() {
     }

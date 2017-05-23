@@ -9,6 +9,11 @@ struct EntryDataKey {
     bool freeze : 1;
     LockFreeElement *data;
 
+
+    bool operator == (const EntryDataKey &dataKey) {
+        return ((key == dataKey.key) && (freeze == dataKey.freeze) && (data == dataKey.data));
+    }
+
     /*
     EntryDataKey() noexcept : data(nullptr), key() {
     }

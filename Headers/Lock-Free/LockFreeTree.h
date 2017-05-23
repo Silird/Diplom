@@ -177,12 +177,12 @@ private:
      * Почему **prev, а не *prev:
      * Сделана структура FindResult, которая содержит результаты
      */
-    void Find(Chunk *chunk, short int key, FindResult *findResult);
+    bool Find(Chunk *chunk, short int key, FindResult *findResult);
 
     /*
      * Возврат нормального указателя * вместо **
      */
-    Entry* EntPtr(Entry **entry);
+    Entry* EntPtr(std::atomic<EntryNext> *entry);
 
     /*
      * Поиск в данном чанке записи с ключом key
@@ -241,7 +241,7 @@ private:
     /*
      * Проверка на то удалена ли запись
      */
-    bool isDeleted(Entry *entry);
+    bool isDeleted(EntryNext entry);
 
     /*
      * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
@@ -321,7 +321,7 @@ private:
     /*
      * Очищает запись (присваевает ей специальный ключ)
      */
-    bool ClearEntry(Chunk *chunk, Entry *entry);
+    bool ClearEntry(LockFreeElement *node, Entry *entry);
 
     /*
      * Увеличивает каунтер элементов в узле
@@ -341,7 +341,7 @@ private:
     /*
      * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
      */
-    EntryNext clearDeleted(EntryNext entry);
+    EntryNext clearDeleted(EntryNext next);
 };
 
 

@@ -2,6 +2,7 @@
 #define DIPLOM_LOCKFREEELEMENT_H
 
 #include "Chunk.h"
+#include "NodeState.h"
 
 // Freeze states
 const short int INFANT = 0;

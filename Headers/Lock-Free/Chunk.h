@@ -2,6 +2,7 @@
 #define DIPLOM_CHUNK_H
 
 #include "Entry.h"
+#include <vector>
 
 const short int IC_SUCCESS_THIS = 0;
 const short int IC_SUCCESS_OTHER = 1;

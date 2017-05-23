@@ -1,6 +1,9 @@
 #include <iostream>
+#include <atomic>
 #include "../Headers/TreeFactory.h"
 #include "../Headers/Processing.h"
+#include "../Headers/Lock-Free/LockFreeElement.h"
+
 
 int main(int argc, char * argv[]) {
     srand((unsigned int) time(0));
@@ -37,6 +40,8 @@ int main(int argc, char * argv[]) {
     tree->printValues();
 
     TreeFactory::getInstance()->clear();
+
+
 
     return 0;
 }
@@ -199,3 +204,45 @@ tree->print();
 
     //tree->printValues();
 */
+
+
+/*
+LockFreeElement *node = new LockFreeElement(1);
+node->height = 2;
+node->counter = 10;
+
+LockFreeElement *node1 = new LockFreeElement(1);
+node1->height = 3;
+node1->counter = 11;
+
+std::atomic<NodeState> state;
+
+
+NodeState tmp(JOIN, node);
+
+tmp.joinBuddy = node;
+tmp.state = JOIN;
+
+state = tmp;
+
+tmp = state;
+
+
+NodeState stateTmp(JOIN, node1);
+bool result;
+result = state.compare_exchange_weak(stateTmp, NodeState(SLAVE_FREEZE, node1));
+tmp = state;
+
+stateTmp.state = SLAVE_FREEZE;
+stateTmp.joinBuddy = node;
+result = state.compare_exchange_weak(stateTmp, NodeState(SLAVE_FREEZE, node1));
+tmp = state;
+
+stateTmp.state = JOIN;
+stateTmp.joinBuddy = node;
+result = state.compare_exchange_weak(stateTmp, NodeState(SLAVE_FREEZE, node1));
+tmp = state;
+
+
+delete node;
+ */

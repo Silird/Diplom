@@ -3,7 +3,7 @@
 
 struct LockFreeElement;
 
-#pragma pack(push, 1)
+//#pragma pack(push, 1)
 struct NodeState {
     LockFreeElement *joinBuddy;
     unsigned short int freezeState : 3;
@@ -18,6 +18,6 @@ struct NodeState {
             joinBuddy(joinBuddy), freezeState(freezeState)   {
     }
 };
-#pragma pack(pop)
+//#pragma pack(pop)
 
 #endif //DIPLOM_NODESTATE_H

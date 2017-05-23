@@ -3,7 +3,7 @@
 
 struct LockFreeElement;
 
-#pragma pack(push, 1)
+//#pragma pack(push, 1)
 struct EntryDataKey {
     short int key;
     bool freeze : 1;
@@ -21,6 +21,6 @@ struct EntryDataKey {
     }
      */
 };
-#pragma pack(pop)
+//#pragma pack(pop)
 
 #endif //DIPLOM_ENTRYDATAKEY_H

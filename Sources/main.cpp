@@ -1,6 +1,9 @@
 #include <iostream>
 #include "../Headers/TreeFactory.h"
 #include "../Headers/Processing.h"
+#include "../Headers/Lock-Free/NodeState.h"
+#include "../Headers/Lock-Free/EntryDataKey.h"
+#include "../Headers/Lock-Free/EntryNext.h"
 
 
 int main(int argc, char * argv[]) {
@@ -36,8 +39,6 @@ int main(int argc, char * argv[]) {
 
     tree->print();
     tree->printValues();
-
-    TreeFactory::getInstance()->clear();
 
     return 0;
 }

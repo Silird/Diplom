@@ -2,22 +2,21 @@
 #define DIPLOM_LOCKFREETREE_H
 
 #include <sudo_plugin.h>
-#include <vector>
 #include "../ITree.h"
 #include "LockFreeElement.h"
 #include "FindResult.h"
 
 // recovery Types
-const short int RT_COPY = 0;
-const short int RT_MERGE = 1;
-const short int RT_SPLIT = 2;
+const unsigned short int RT_COPY = 0;
+const unsigned short int RT_MERGE = 1;
+const unsigned short int RT_SPLIT = 2;
 
 // trigger Types
-const short int TT_DELETE = 0;
-const short int TT_INSERT = 1;
-const short int TT_REPLACE = 2;
-const short int TT_ENSLAVE = 4;
-const short int TT_NONE = 5;
+const unsigned short int TT_DELETE = 0;
+const unsigned short int TT_INSERT = 1;
+const unsigned short int TT_REPLACE = 2;
+const unsigned short int TT_ENSLAVE = 4;
+const unsigned short int TT_NONE = 5;
 
 
 class LockFreeTree : public virtual ITree {
@@ -96,7 +95,7 @@ private:
      * node - узел, который хочет обновить дерево
      * sepKey - возможный ключ сепаратор, если сплит или борроу
      */
-    void CallForUpdate(short int freezeState, LockFreeElement *node, short int sepKey);
+    void CallForUpdate(unsigned short int freezeState, LockFreeElement *node, short int sepKey);
 
     /*
      * Помощь узлу, которы находится в состоянии INFANT
@@ -121,8 +120,8 @@ private:
      * Замена в целевом чанке записи с данным ключом на neww, но если
      * нынешнее значение равно exp
      */
-    bool ReplaceInChunk(LockFreeElement *node, short int key, LockFreeElement *exp,
-                        LockFreeElement *neww);
+    bool ReplaceInChunk(LockFreeElement *node, short int key, EntryDataKey exp,
+                        EntryDataKey neww);
 
     /*
      * На вход даётся чанк, у которого все записи заморожены и не должны изменяться
@@ -139,7 +138,7 @@ private:
     /*
      * Выбор действия, которые надо воспроизвести с чанком, вышел ли он за пределы значений MAX и MIN
      */
-    short int FreezeDecision(Chunk *chunk);
+    unsigned short int FreezeDecision(Chunk *chunk);
 
     /*
      * Замораживание узла
@@ -148,8 +147,8 @@ private:
      * Обозначение всех входных данных смотри в FreezeRecovery,
      * так как он является логическим продолжением
      */
-    Chunk* Freeze(LockFreeElement *node, short int key, LockFreeElement *expected,
-                  LockFreeElement *data, short int tgr, bool *res);
+    Chunk* Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
+                  EntryDataKey data, unsigned short int tgr, bool *res);
 
     /*
      * Восстановление замороженного узла oldNode с ключом в родительском узле key
@@ -163,9 +162,9 @@ private:
      * в result записывается успешность всей вставки узла
      */
     Chunk* FreezeRecovery(LockFreeElement *oldNode, short int key,
-                          LockFreeElement *expected, LockFreeElement *input,
-                          short int recovType, LockFreeElement *mergePartner,
-                          short int trigger, bool *result);
+                          EntryDataKey expected, EntryDataKey input,
+                          unsigned short int recovType, LockFreeElement *mergePartner,
+                          unsigned short int trigger, bool *result);
 
     // те, которые не известны
     /*
@@ -206,10 +205,9 @@ private:
     short int getMaxKey(LockFreeElement *node);
 
     /*
-     * TODO Получает две переменные с каким-то количеством битов, объединяет их в одно машинное слово с этим пока проблемы
      * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
      */
-    LockFreeElement* combine(short int key, LockFreeElement *node);
+    EntryDataKey combine(short int key, LockFreeElement *node);
 
     /*
      * Создание нового пустого узла
@@ -233,7 +231,12 @@ private:
     /*
      * Проверка на то заморожена ли запись
      */
-    bool isFrozen(Entry *entry);
+    bool isFrozen(EntryDataKey dataKey);
+
+    /*
+     * Проверка на то заморожена ли запись
+     */
+    bool isFrozen(EntryNext dataKey);
 
     /*
      * Проверка на то удалена ли запись
@@ -243,12 +246,17 @@ private:
     /*
      * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
      */
-    short int InsertEntry(Chunk *chunk, Entry *e, short int key);
+    unsigned short int InsertEntry(Chunk *chunk, Entry *e, short int key);
 
     /*
      * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
      */
-    Entry* MarkFrozen(Entry* entry);
+    EntryDataKey MarkFrozen(EntryDataKey dataKey);
+
+    /*
+     * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+     */
+    EntryNext MarkFrozen(EntryNext next);
 
     /*
      * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
@@ -328,12 +336,12 @@ private:
     /*
      * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
      */
-    Entry* MarkDeleted(Entry* entry);
+    EntryNext MarkDeleted(EntryNext next);
 
     /*
      * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
      */
-    Entry* clearDeleted(Entry* entry);
+    EntryNext clearDeleted(EntryNext entry);
 };
 
 

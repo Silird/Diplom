@@ -5,7 +5,10 @@ LockFreeTree::LockFreeTree(int range) {
     MAX = range;
     MIN = range/2 - 3;
     root = Allocate();
-    root.load(std::memory_order_relaxed)->freezeState = NORMAL;
+    root.load(std::memory_order_relaxed)->setFreezeState(NORMAL);
+
+    LockFreeElement *tmp = root;
+    unsigned short int freeze = tmp->getFreezeState();
 
     /*
     Entry *entry = new Entry();
@@ -27,7 +30,7 @@ LockFreeTree::~LockFreeTree() {
 
 bool LockFreeTree::add(short int key) {
     LockFreeElement *node = FindLeaf(key);
-    if (node->freezeState == INFANT) {
+    if (node->getFreezeState() == INFANT) {
         helpInfant(node);
     }
     return InsertToChunk(node, key, nullptr);
@@ -40,7 +43,7 @@ bool LockFreeTree::search(short int key) {
 
 bool LockFreeTree::remove(short int key) {
     LockFreeElement *node = FindLeaf(key);
-    if (node->freezeState == INFANT) {
+    if (node->getFreezeState() == INFANT) {
         helpInfant(node);
     }
     return DeleteInChunk(node, key);
@@ -48,7 +51,7 @@ bool LockFreeTree::remove(short int key) {
 
 void LockFreeTree::print() {
     LockFreeElement *tmpRoot = root;
-    if (tmpRoot->chunk->head->next == nullptr) {
+    if (tmpRoot->chunk->head->getNext() == nullptr) {
         std::cout << "Tree is empty" << std::endl;
     }
     else {
@@ -59,7 +62,7 @@ void LockFreeTree::print() {
 
 void LockFreeTree::printValues() {
     LockFreeElement *tmpRoot = root;
-    if (tmpRoot->chunk->head->next == nullptr) {
+    if (tmpRoot->chunk->head->getNext() == nullptr) {
         std::cout << "Tree is empty" << std::endl;
     }
     else {
@@ -71,7 +74,7 @@ void LockFreeTree::printValues() {
 
 void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
     if (element != nullptr) {
-        Entry *current = element->chunk->head->next;
+        Entry *current = element->chunk->head->getNext();
         while (current != nullptr) {
             for (int i = 0; i < maxHeight - element->height; i++) {
                 if (i == (element->height - 1)) {
@@ -81,7 +84,7 @@ void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
                     std::cout << "|  ";
                 }
             }
-            std::cout << current->key;
+            std::cout << current->getKey();
             if (element->height == 0) {
                 std::cout << " (value)";
             }
@@ -91,16 +94,16 @@ void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
 
             std::cout << std::endl;
 
-            current = current->next;
+            current = current->getNext();
         }
 
         std::cout << "|" << std::endl;
 
-        current = element->chunk->head->next;
+        current = element->chunk->head->getNext();
         while (current != nullptr) {
-            print(current->data, maxHeight);
+            print(current->getData(), maxHeight);
 
-            current = current->next;
+            current = current->getNext();
         }
     }
 }
@@ -108,19 +111,19 @@ void LockFreeTree::print(LockFreeElement *element, int maxHeight) {
 void LockFreeTree::printValues(LockFreeElement *element) {
     if (element != nullptr) {
         if (element->height != 0) {
-            Entry *current = element->chunk->head->next;
+            Entry *current = element->chunk->head->getNext();
             while (current != nullptr) {
-                printValues(current->data);
+                printValues(current->getData());
 
-                current = current->next;
+                current = current->getNext();
             }
         }
         else {
-            Entry *current = element->chunk->head->next;
+            Entry *current = element->chunk->head->getNext();
             while (current != nullptr) {
-                std::cout << current->key << " ";
+                std::cout << current->getKey() << " ";
 
-                current = current->next;
+                current = current->getNext();
             }
         }
     }
@@ -137,7 +140,7 @@ LockFreeElement* LockFreeTree::FindLeaf(short int key) {
     while ( node->height != 0 ) {
         FindResult findResult;
         Find(node->chunk, key, &findResult);
-        node = findResult.cur->data;
+        node = findResult.cur->getData();
     }
     return node;
 }
@@ -153,9 +156,9 @@ LockFreeElement* LockFreeTree::FindParent(short int key, LockFreeElement *childN
     while (node->height != 0) {
         FindResult findResult;
         Find(node->chunk, key, &findResult);
-        if (childNode == findResult.cur->data) {
+        if (childNode == findResult.cur->getData()) {
             *prntEnt = findResult.cur;
-            if (slaveEnt != NULL) {
+            if (slaveEnt != nullptr) {
                 if (findResult.prev == &(node->chunk->head)) {
                     *slaveEnt = findResult.next;
                 }
@@ -163,12 +166,12 @@ LockFreeElement* LockFreeTree::FindParent(short int key, LockFreeElement *childN
                     *slaveEnt = EntPtr(findResult.prev);
                 }
             }
-            if (node->freezeState == INFANT) {
+            if (node->getFreezeState() == INFANT) {
                 helpInfant(node);
             }
             return node;
         }
-        node = findResult.cur->data;
+        node = findResult.cur->getData();
     }
     return nullptr;
 }
@@ -189,24 +192,16 @@ void LockFreeTree::InsertSplitNodes(LockFreeElement *node, short int sepKey) {
         InsertToChunk(parent, sepKey, n1);
     }
     if ((parent = FindParent(maxKey, node, &nodeEnt, nullptr)) != nullptr) {
-        ReplaceInChunk(parent, nodeEnt->key,
-                combine(nodeEnt->key, node), combine(nodeEnt->key, n2));
+        ReplaceInChunk(parent, nodeEnt->getKey(),
+                combine(nodeEnt->getKey(), node), combine(nodeEnt->getKey(), n2));
     }
-    // TODO нормальные касы
-    short int tmp;
-    LockFreeElement *tmpEl;
-    if ((n1->freezeState == INFANT) && (n1->joinBuddy == nullptr)) {
-        tmp = INFANT;
-        tmpEl = nullptr;
-        n1->freezeState.compare_exchange_weak(tmp, NORMAL);
-        n1->joinBuddy.compare_exchange_weak(tmpEl, nullptr);
-    }
-    if ((n2->freezeState == INFANT) && (n2->joinBuddy == nullptr)) {
-        tmp = INFANT;
-        tmpEl = nullptr;
-        n2->freezeState.compare_exchange_weak(tmp, NORMAL);
-        n2->joinBuddy.compare_exchange_weak(tmpEl, nullptr);
-    }
+
+    NodeState nodeStateExp(INFANT);
+    n1->state.compare_exchange_weak(nodeStateExp, NodeState(NORMAL));
+    nodeStateExp.freezeState = INFANT;
+    nodeStateExp.joinBuddy = nullptr;
+    n2->state.compare_exchange_weak(nodeStateExp, NodeState(NORMAL));
+
     return;
 }
 
@@ -215,64 +210,43 @@ void LockFreeTree::InsertSplitNodes(LockFreeElement *node, short int sepKey) {
  * Устанавливет состояния у обоих узлов
  */
 LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeElement *oldSlave) {
-    short int anyKey = master->chunk->head->next.load(std::memory_order_relaxed)->key;
+    short int anyKey = master->chunk->head->getNext()->getKey();
     LockFreeElement *parent;
     Entry *masterEnt;
     Entry *slaveEnt;
     if ((parent = FindParent(anyKey, master, &masterEnt, &slaveEnt)) == nullptr) {
-        // TODO возвратить джоин бади, без всяких LSB bit
-        return master->joinBuddy;
+        return master->getJoinBuddy();
     }
-    LockFreeElement *slave = slaveEnt->data;
+    LockFreeElement *slave = slaveEnt->getData();
 
-    // TODO сделать нормальный объединённое состояние
-    short int expState;
-    LockFreeElement *expJoinBuddy;
+    NodeState expState;
     if (oldSlave == nullptr) {
-        // TODO сделать нормальный объединённое состояние
-        expState = FREEZE;
-        expJoinBuddy = nullptr;
+        expState = NodeState(FREEZE);
     }
     else  {
-        // TODO сделать нормальный объединённое состояние
-        expState = REQUEST_SLAVE;
-        expJoinBuddy = oldSlave;
+        expState = NodeState(REQUEST_SLAVE, oldSlave);
     }
 
-    // TODO сделать нормальный кас
-    bool casResult = false;
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        casResult = master->freezeState.compare_exchange_weak(expState, REQUEST_SLAVE);
-        casResult = casResult && master->joinBuddy.compare_exchange_weak(expJoinBuddy, slave);
-    }
-    if (!casResult) {
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        if (master->freezeState == JOIN) {
-            return master->joinBuddy;
+    if (!master->state.compare_exchange_weak(expState, NodeState(REQUEST_SLAVE, slave))) {
+        if (master->getFreezeState() == JOIN) {
+            return master->getJoinBuddy();
         }
     }
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    slave = master->joinBuddy;
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    if ((parent->freezeState != NORMAL) && (oldSlave == nullptr)) {
+    slave = master->getJoinBuddy();
+    if ((parent->getFreezeState() != NORMAL) && (oldSlave == nullptr)) {
         bool result;
-        Freeze(parent, 0, nullptr, master, TT_NONE, &result);
+        Freeze(parent, 0, combine(EMPTY, nullptr), combine(masterEnt->getKey(), master), TT_NONE, &result);
         FindJoinSlave(master, slave);
     }
-    if (!SetSlave(master, slave, anyKey, slave->chunk->head->next.load(std::memory_order_relaxed)->key)) {
+    if (!SetSlave(master, slave, masterEnt->getKey(), slave->chunk->head->getNext()->getKey())) {
         FindJoinSlave(master, slave);
     }
 
-    // TODO сделать нормальный кас
-    expState = REQUEST_SLAVE;
-    expJoinBuddy = slave;
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        master->freezeState.compare_exchange_weak(expState, JOIN);
-        master->joinBuddy.compare_exchange_weak(expJoinBuddy, slave);
-    }
+    expState.freezeState = REQUEST_SLAVE;
+    expState.joinBuddy = slave;
+    master->state.compare_exchange_weak(expState, NodeState(JOIN, slave));
 
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    if (master->freezeState == JOIN) {
+    if (master->getFreezeState() == JOIN) {
         return slave;
     }
 
@@ -285,53 +259,33 @@ LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeEl
  */
 bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, short int masterKey,
               short int slaveKey) {
-    short int expState = NORMAL;
-    LockFreeElement *expJoinBuddy = nullptr;
-    // TODO сделать нормальный кас в вайл вставить
-    bool casResult = false;
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        casResult = master->freezeState.compare_exchange_weak(expState, SLAVE_FREEZE);
-        casResult = casResult && master->joinBuddy.compare_exchange_weak(expJoinBuddy, master);
-    }
 
-
-    if (!casResult) {
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        if (slave->freezeState == INFANT) {
+    NodeState expState(NORMAL);
+    if (!master->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, master))) {
+        if (slave->getFreezeState() == INFANT) {
             helpInfant(slave);
             return false;
         }
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        else if ((slave->freezeState == SLAVE_FREEZE) && (slave->joinBuddy == master)) {
+        else if ((slave->getFreezeState() == SLAVE_FREEZE) && (slave->getJoinBuddy() == master)) {
         }
         else {
-            // TODO сделать нормальные сравнения с объединёнными переменными
-            if ((slave->freezeState == REQUEST_SLAVE) && (slave->joinBuddy == master)) {
+            if ((slave->getFreezeState() == REQUEST_SLAVE) && (slave->getJoinBuddy() == master)) {
                 if (masterKey < slaveKey) {
-                    expState = REQUEST_SLAVE;
-                    expJoinBuddy = slave;
-                    // TODO сделать нормальный кас в вайл вставить
-                    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-                        casResult = master->freezeState.compare_exchange_weak(expState, SLAVE_FREEZE);
-                        casResult = casResult && master->joinBuddy.compare_exchange_weak(expJoinBuddy, slave);
-                    }
+                    expState.freezeState = REQUEST_SLAVE;
+                    expState.joinBuddy = slave;
+                    // TODO ??? expState = REQUEST_SLAVE, slave;
 
-                    return casResult;
+                    return master->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, slave));
                 }
                 else {
-                    expState = REQUEST_SLAVE;
-                    expJoinBuddy = master;
-                    // TODO сделать нормальный кас в вайл вставить
-                    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-                        casResult = master->freezeState.compare_exchange_weak(expState, SLAVE_FREEZE);
-                        casResult = casResult && master->joinBuddy.compare_exchange_weak(expJoinBuddy, master);
-                    }
+                    expState.freezeState = REQUEST_SLAVE;
+                    expState.joinBuddy = master;
 
-                    return casResult;
+                    return slave->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, master));
                 }
             }
             bool result;
-            Freeze(slave, 0, nullptr, master, TT_ENSLAVE , &result);
+            Freeze(slave, 0, combine(EMPTY, nullptr), combine(masterKey, master), TT_ENSLAVE , &result);
             return false;
         }
     }
@@ -349,8 +303,7 @@ bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, sho
 void LockFreeTree::InsertBorrowNodes(LockFreeElement *master, short int sepKey) {
     LockFreeElement* n1 = master->neww;
     LockFreeElement* n2 = master->neww.load(std::memory_order_relaxed)->nextNew;
-    // TODO сделать нормальное присвоение с объединёнными переменнами
-    LockFreeElement *slave = master->joinBuddy;
+    LockFreeElement *slave = master->getJoinBuddy();
 
     short int maxMasterKey = getMaxKey(master);
     short int maxSlaveKey = getMaxKey(slave);
@@ -388,27 +341,21 @@ void LockFreeTree::InsertBorrowNodes(LockFreeElement *master, short int sepKey) 
     LockFreeElement *highParent;
     Entry *highEnt;
     if ((highParent = FindParent(highKey, oldHigh, &highEnt, nullptr)) != nullptr) {
-        ReplaceInChunk(highParent, highEnt->key,
-                       combine(highEnt->key, oldHigh), combine(highEnt->key, n2));
+        ReplaceInChunk(highParent, highEnt->getKey(),
+                       combine(highEnt->getKey(), oldHigh), combine(highEnt->getKey(), n2));
     }
     LockFreeElement *lowParent;
     Entry *lowEnt;
     if ((lowParent = FindParent(lowKey, oldLow, &lowEnt, nullptr)) != nullptr) {
-        DeleteInChunk(lowParent,lowEnt->key);
+        DeleteInChunk(lowParent, lowEnt->getKey());
     }
 
-    short int expState = INFANT;
-    LockFreeElement *expJoinBuddy = nullptr;
-    // TODO сделать нормальный кас в вайл вставить
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        master->freezeState.compare_exchange_weak(expState, NORMAL);
-        master->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
-    // TODO сделать нормальный кас в вайл вставить
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        master->freezeState.compare_exchange_weak(expState, NORMAL);
-        master->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
+    NodeState expState(INFANT);
+    n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    expState.freezeState = INFANT;
+    expState.joinBuddy = nullptr;
+    n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
+
     return;
 }
 
@@ -420,8 +367,7 @@ void LockFreeTree::InsertBorrowNodes(LockFreeElement *master, short int sepKey) 
  */
 void LockFreeTree::InsertMergeNode(LockFreeElement *master) {
     LockFreeElement *neww = master->neww;
-    // TODO сделать нормальное присвоение с объединёнными переменнами
-    LockFreeElement *slave = master->joinBuddy;
+    LockFreeElement *slave = master->getJoinBuddy();
 
     short int maxMasterKey = getMaxKey(master);
     short int maxSlaveKey = getMaxKey(slave);
@@ -446,27 +392,22 @@ void LockFreeTree::InsertMergeNode(LockFreeElement *master) {
     LockFreeElement *parent;
     Entry *highEnt;
     if ((parent = FindParent(highKey, highNode, &highEnt, nullptr )) != nullptr) {
-        short int highEntKey = highEnt->key;
+        short int highEntKey = highEnt->getKey();
         ReplaceInChunk(parent, highEntKey,
                 combine(highEntKey, highNode), combine(highEntKey, neww));
     }
     Entry *lowEnt;
     if ((parent = FindParent(lowKey, lowNode, &lowEnt, nullptr)) != nullptr) {
         if (parent == root) {
-            MergeRoot(parent, neww, lowNode, lowEnt->key);
+            MergeRoot(parent, neww, lowNode, lowEnt->getKey());
         }
         else {
-            DeleteInChunk(parent, lowEnt->key);
+            DeleteInChunk(parent, lowEnt->getKey());
         }
     }
 
-    short int expState = INFANT;
-    LockFreeElement *expJoinBuddy = nullptr;
-    // TODO сделать нормальный кас в вайл вставить
-    if ((master->freezeState == expState) && (master->joinBuddy == expJoinBuddy)) {
-        master->freezeState.compare_exchange_weak(expState, NORMAL);
-        master->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
+    NodeState expState(INFANT);
+    neww->state.compare_exchange_weak(expState, NodeState(NORMAL));
 }
 
 /*
@@ -475,7 +416,7 @@ void LockFreeTree::InsertMergeNode(LockFreeElement *master) {
  * node - узел, который хочет обновить дерево
  * sepKey - возможный ключ сепаратор, если сплит или борроу
  */
-void LockFreeTree::CallForUpdate(short int freezeState, LockFreeElement *node, short int sepKey) {
+void LockFreeTree::CallForUpdate(unsigned short int freezeState, LockFreeElement *node, short int sepKey) {
     LockFreeElement *n1 = node->neww;
     LockFreeElement *n2 = node->neww.load(std::memory_order_relaxed)->nextNew;
     switch (freezeState) {
@@ -484,20 +425,15 @@ void LockFreeTree::CallForUpdate(short int freezeState, LockFreeElement *node, s
             Entry *nodeEnt;
             if (node == root) {
                 root.compare_exchange_weak(node, n1);
-            } else if (
-                    (parent = FindParent(node->chunk->head->next.load(std::memory_order_relaxed)->key, node, &nodeEnt,
-                                         nullptr)) != nullptr) {
-                ReplaceInChunk(parent, node->chunk->head->next.load(std::memory_order_relaxed)->key,
-                               combine(nodeEnt->key, node), combine(nodeEnt->key, n1));
+            }
+            else if ((parent = FindParent(node->chunk->head->getNext()->getKey(),
+                                          node, &nodeEnt, nullptr)) != nullptr) {
+                ReplaceInChunk(parent, node->chunk->head->getNext()->getKey(),
+                               combine(nodeEnt->getKey(), node), combine(nodeEnt->getKey(), n1));
             }
 
-            short int expState = INFANT;
-            LockFreeElement *expJoinBuddy = nullptr;
-            // TODO сделать нормальный кас в вайл вставить
-            if ((n1->freezeState == expState) && (n1->joinBuddy == expJoinBuddy)) {
-                n1->freezeState.compare_exchange_weak(expState, NORMAL);
-                n1->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-            }
+            NodeState expState(INFANT);
+            n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
 
             return;
         }
@@ -529,53 +465,34 @@ void LockFreeTree::CallForUpdate(short int freezeState, LockFreeElement *node, s
  */
 void LockFreeTree::helpInfant(LockFreeElement *node) {
     LockFreeElement *creator = node->creator;
-    // TODO сделать нормальное присвоение с объединёнными переменнами
-    short int creatorFrSt = creator->freezeState;
+    short int creatorFrSt = creator->getFreezeState();
     LockFreeElement *n1 = creator->neww;
     LockFreeElement *n2 = creator->neww.load(std::memory_order_relaxed)->nextNew;
 
     short int sepKey = getMaxKey(n1);
 
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    if (n1->freezeState != INFANT) {
+    if (n1->getFreezeState() != INFANT) {
         if (n2) {
-            short int expState = INFANT;
-            LockFreeElement *expJoinBuddy = nullptr;
-            // TODO сделать нормальный кас в вайл вставить
-            if ((n2->freezeState == expState) && (n2->joinBuddy == expJoinBuddy)) {
-                n2->freezeState.compare_exchange_weak(expState, NORMAL);
-                n2->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-            }
+            NodeState expState(INFANT);
+            n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
         }
         return;
     }
     if ((creator == root) && (creatorFrSt == SPLIT)) {
 
-        short int expState = INFANT;
-        LockFreeElement *expJoinBuddy = nullptr;
-        // TODO сделать нормальный кас в вайл вставить
-        if ((n1->freezeState == expState) && (n1->joinBuddy == expJoinBuddy)) {
-            n1->freezeState.compare_exchange_weak(expState, NORMAL);
-            n1->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-        }
-        // TODO сделать нормальный кас в вайл вставить
-        if ((n2->freezeState == expState) && (n2->joinBuddy == expJoinBuddy)) {
-            n2->freezeState.compare_exchange_weak(expState, NORMAL);
-            n2->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-        }
+        NodeState expState(INFANT);
+        n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+        expState.freezeState = INFANT;
+        expState.joinBuddy = nullptr;
+        n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
 
         return;
     }
 
     switch (creatorFrSt) {
         case COPY: {
-            short int expState = INFANT;
-            LockFreeElement *expJoinBuddy = nullptr;
-            // TODO сделать нормальный кас в вайл вставить
-            if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-                node->freezeState.compare_exchange_weak(expState, NORMAL);
-                node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-            }
+            NodeState expState(INFANT);
+            node->state.compare_exchange_weak(expState, NodeState(NORMAL));
 
             return;
         }
@@ -604,26 +521,17 @@ void LockFreeTree::helpInfant(LockFreeElement *node) {
 void LockFreeTree::SplitRoot(LockFreeElement *oldRoot, short int sepKey, LockFreeElement *n1,
                LockFreeElement *n2) {
     LockFreeElement *newRoot = Allocate();
-    // TODO сделать нормальное присвоение с объединёнными переменнами
-    newRoot->freezeState = NORMAL;
-    newRoot->joinBuddy = nullptr;
+    newRoot->state = NodeState(NORMAL);
     newRoot->height = oldRoot->height + 1;
     addRootSons(newRoot, sepKey, n1, INF, n2);
 
     root.compare_exchange_weak(oldRoot, newRoot);
 
-    short int expState = INFANT;
-    LockFreeElement *expJoinBuddy = nullptr;
-    // TODO сделать нормальный кас в вайл вставить
-    if ((n1->freezeState == expState) && (n1->joinBuddy == expJoinBuddy)) {
-        n1->freezeState.compare_exchange_weak(expState, NORMAL);
-        n1->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
-    // TODO сделать нормальный кас в вайл вставить
-    if ((n2->freezeState == expState) && (n2->joinBuddy == expJoinBuddy)) {
-        n2->freezeState.compare_exchange_weak(expState, NORMAL);
-        n2->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
+    NodeState expState(INFANT);
+    n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    expState.freezeState = INFANT;
+    expState.joinBuddy = nullptr;
+    n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
 
     return;
 }
@@ -640,7 +548,7 @@ void LockFreeTree::MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleN
         DeleteInChunk(oldRoot, c1Key);
         return;
     }
-    if ((firstEnt.data == c1) && (secondEnt.data == posibleNewRoot)) {
+    if ((firstEnt.getData() == c1) && (secondEnt.getData() == posibleNewRoot)) {
         root.compare_exchange_weak(oldRoot, posibleNewRoot);
     }
     return;
@@ -650,16 +558,15 @@ void LockFreeTree::MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleN
  * Замена в целевом чанке записи с данным ключом на neww, но если
  * нынешнее значение равно exp
  */
-bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, LockFreeElement *exp,
-                                  LockFreeElement *neww) {
+bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, EntryDataKey exp,
+                                  EntryDataKey neww) {
     FindResult findResult;
     Find(node->chunk, key, &findResult);
     if (findResult.cur == nullptr) {
         return false;
     }
-    if (!findResult.cur->data.compare_exchange_weak(exp, neww)) {
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        if (isFrozen(findResult.cur)) {
+    if (!findResult.cur->dataKey.compare_exchange_weak(exp, neww)) {
+        if (isFrozen(findResult.cur->dataKey)) {
             bool result;
 
             Chunk *tmpChunk = Freeze(node, key, exp, neww, TT_REPLACE , &result);
@@ -682,12 +589,12 @@ void LockFreeTree::StabilizeChunk(Chunk *chunk) {
     FindResult findResult;
     // Удаление всех помеченных на удаление записей через файнд
     Find(chunk, maxKey, &findResult);
-    Entry *current = chunk->head->next;
-    while (current != nullptr) {
-        short int key = current->key;
-        Entry *eNext = current->next;
+    for (int i = 0; i < chunk->entries.size(); i++) {
+        Entry *current = chunk->entries[i];
+        short int key = current->getKey();
+        Entry *eNext = current->getNext();
         // Вставка всех выделенных записей, которые не в списке
-        if ( (key != EMPTY) && (!isDeleted(eNext))) {
+        if ((key != EMPTY) && (!isDeleted(eNext))) {
             Find(chunk, key, &findResult);
             if (findResult.cur == nullptr) {
                 InsertEntry(chunk, current, key);
@@ -701,29 +608,40 @@ void LockFreeTree::StabilizeChunk(Chunk *chunk) {
  * Замораживает весь чанк, включая записи, котоыре не в списке
  */
 void LockFreeTree::MarkChunkFrozen(Chunk *chunk) {
-    // TODO
+    for (int i = 0; i < chunk->entries.size(); i++) {
+        Entry *current = chunk->entries[i];
+
+        EntryNext savedNext = current->next;
+        while (!isFrozen(savedNext)) {
+            current->next.compare_exchange_weak(savedNext, MarkFrozen(savedNext));
+            savedNext = current->next;
+        }
+        EntryDataKey savedDataKey = current->dataKey;
+        while (!isFrozen(savedDataKey)) {
+            current->dataKey.compare_exchange_weak(savedDataKey, MarkFrozen(savedDataKey));
+            savedDataKey = current->dataKey;
+        }
+    }
+    return;
 }
 
 /*
  * Выбор действия, которые надо воспроизвести с чанком, вышел ли он за пределы значений MAX и MIN
  */
-short int LockFreeTree::FreezeDecision(Chunk *chunk) {
-    //Entry *e = chunk->head->next;
+unsigned short int LockFreeTree::FreezeDecision(Chunk *chunk) {
+    Entry *e = chunk->head->getNext();
     int cnt = 0;
-    /*
-     * TODO WTF???
-    while (clearFrozen(e) != NULL) {
+    while (clearFrozen(e) != nullptr) {
         cnt++;
-        e = e->next;
+        e = e->getNext();
     }
-     */
     if (cnt <= MIN) {
         return RT_MERGE;
     }
     if (cnt >= MAX) {
         return RT_SPLIT;
     }
-    return RT_COPY ;
+    return RT_COPY;
 }
 
 /*
@@ -733,20 +651,14 @@ short int LockFreeTree::FreezeDecision(Chunk *chunk) {
  * Обозначение всех входных данных смотри в FreezeRecovery,
  * так как он является логическим продолжением
  */
-Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElement *expected,
-              LockFreeElement *data, short int tgr, bool *res) {
-    short int expState = NORMAL;
-    LockFreeElement *expJoinBuddy = nullptr;
-    // TODO сделать нормальный кас в вайл вставить
-    if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-        node->freezeState.compare_exchange_weak(expState, FREEZE);
-        node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-    }
+Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
+                            EntryDataKey data, unsigned short int tgr, bool *res) {
+    NodeState expState(NORMAL);
+    node->state.compare_exchange_weak(expState, NodeState(FREEZE));
 
-    short int decision = RT_MERGE;
+    unsigned short int decision = RT_MERGE;
     LockFreeElement *mergePartner = nullptr;
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    switch (node->freezeState) {
+    switch (node->getFreezeState()) {
         case COPY: {
             decision = RT_COPY;
             break;
@@ -757,8 +669,7 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
         }
         case JOIN: {
             decision = RT_MERGE;
-            // TODO сделать нормальное присвоение с объединёнными переменнами
-            mergePartner = node->joinBuddy;
+            mergePartner = node->getJoinBuddy();
             break;
         }
         case REQUEST_SLAVE: {
@@ -770,8 +681,7 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
         }
         case SLAVE_FREEZE: {
             decision = RT_MERGE;
-            // TODO сделать нормальное присвоение с объединёнными переменнами
-            mergePartner = node->joinBuddy;
+            mergePartner = node->getJoinBuddy();
 
             LockFreeElement *tmp = mergePartner;
             mergePartner = node;
@@ -780,13 +690,9 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
             MarkChunkFrozen(mergePartner->chunk);
             StabilizeChunk(mergePartner->chunk);
 
-            expState = REQUEST_SLAVE;
-            expJoinBuddy = mergePartner;
-            // TODO сделать нормальный кас в вайл вставить
-            if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-                node->freezeState.compare_exchange_weak(expState, JOIN);
-                node->joinBuddy.compare_exchange_weak(expJoinBuddy, mergePartner);
-            }
+            expState.freezeState = REQUEST_SLAVE;
+            expState.joinBuddy = mergePartner;
+            node->state.compare_exchange_weak(expState, NodeState(JOIN, mergePartner));
             break;
         }
         case FREEZE: {
@@ -796,39 +702,26 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
 
             switch (decision) {
                 case RT_COPY: {
-                    expState = FREEZE;
-                    expJoinBuddy = nullptr;
-                    // TODO сделать нормальный кас в вайл вставить
-                    if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-                        node->freezeState.compare_exchange_weak(expState, COPY);
-                        node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-                    }
+                    expState.freezeState = FREEZE;
+                    expState.joinBuddy = nullptr;
+                    node->state.compare_exchange_weak(expState, NodeState(COPY));
                     break;
                 }
                 case RT_SPLIT: {
-                    expState = FREEZE;
-                    expJoinBuddy = nullptr;
-                    // TODO сделать нормальный кас в вайл вставить
-                    if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-                        node->freezeState.compare_exchange_weak(expState, SPLIT);
-                        node->joinBuddy.compare_exchange_weak(expJoinBuddy, nullptr);
-                    }
+                    expState.freezeState = FREEZE;
+                    expState.joinBuddy = nullptr;
+                    node->state.compare_exchange_weak(expState, NodeState(SPLIT));
                     break;
                 }
                 case RT_MERGE: {
                     mergePartner = FindJoinSlave(node, nullptr);
                     if (mergePartner == nullptr) {
                         mergePartner = node;
-                        // TODO сделать нормальное присвоение с объединёнными переменнами
-                        node = node->joinBuddy;
+                        node = node->getJoinBuddy();
 
-                        expState = REQUEST_SLAVE;
-                        expJoinBuddy = mergePartner;
-                        // TODO сделать нормальный кас в вайл вставить
-                        if ((node->freezeState == expState) && (node->joinBuddy == expJoinBuddy)) {
-                            node->freezeState.compare_exchange_weak(expState, JOIN);
-                            node->joinBuddy.compare_exchange_weak(expJoinBuddy, mergePartner);
-                        }
+                        expState.freezeState = REQUEST_SLAVE;
+                        expState.joinBuddy = mergePartner;
+                        node->state.compare_exchange_weak(expState, NodeState(JOIN, mergePartner));
                     }
                     break;
                 }
@@ -836,6 +729,8 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
                     break;
             }
         }
+        default:
+            break;
     }
     return FreezeRecovery(node, key, expected, data, decision, mergePartner, tgr, res);
 }
@@ -852,9 +747,9 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, LockFreeElemen
  * в result записывается успешность всей вставки узла
  */
 Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
-                      LockFreeElement *expected, LockFreeElement *input,
-                      short int recovType, LockFreeElement *mergePartner,
-                      short int trigger, bool *result) {
+                                    EntryDataKey expected, EntryDataKey input,
+                                    unsigned short int recovType, LockFreeElement *mergePartner,
+                                    unsigned short int trigger, bool *result) {
     LockFreeElement *retNode = nullptr;
     short int sepKey = INF;
     LockFreeElement *newNode1 = Allocate();
@@ -893,29 +788,26 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     }
 
     if ((newNode2 != nullptr) && (newNode2->height != 0)) {
-        LockFreeElement *leftNode = getMaxEntry(newNode1)->data;
-        // TODO сделать нормальное присвоение с объединёнными переменнами
-        short int leftState = leftNode->freezeState;
-        LockFreeElement *rightNode = newNode2->chunk->head->next.load(std::memory_order_relaxed)->data;
-        // TODO сделать нормальное присвоение с объединёнными переменнами
-        short int rightState = rightNode->freezeState;
+        LockFreeElement *leftNode = getMaxEntry(newNode1)->getData();
+        unsigned short int leftState = leftNode->getFreezeState();
+        LockFreeElement *leftJoinBuddy = leftNode->getJoinBuddy();
+        LockFreeElement *rightNode = newNode2->chunk->head->getNext()->getData();
+        unsigned short int rightState = rightNode->getFreezeState();
+        LockFreeElement *rightJoinBuddy = rightNode->getJoinBuddy();
 
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        if ((rightState == REQUEST_SLAVE) && ((leftState == NORMAL ) || (leftState == INFANT ) || (leftState == FREEZE ) ||
-                (leftState == COPY ) || (leftState == SLAVE_FREEZE/*<SLAVE FREEZE , rightNode>*/))) {
+        if ((rightState == REQUEST_SLAVE) && ((leftState == NORMAL) || (leftState == INFANT) || (leftState == FREEZE) ||
+                (leftState == COPY) || ((leftState == SLAVE_FREEZE) && (leftJoinBuddy == rightNode)))) {
             moveEntryFromFirstToSecond(newNode1, newNode2);
-            sepKey = getMaxEntry(newNode1)->key;
+            sepKey = getMaxEntry(newNode1)->getKey();
         }
-        // TODO сделать нормальные сравнения с объединёнными переменными
-        else if (rightState == JOIN/*< MERGE , leftNode>*/) {
+        else if ((rightState == JOIN) && (rightJoinBuddy == leftNode)) {
             moveEntryFromFirstToSecond(newNode1, newNode2);
-            sepKey = getMaxEntry(newNode1)->key;
+            sepKey = getMaxEntry(newNode1)->getKey();
         }
         else if ((rightState == INFANT) && (leftState == SLAVE_FREEZE)) {
-            // TODO сделать нормальные сравнения с объединёнными переменными
-            if (rightNode->creator == leftNode->joinBuddy) {
+            if (rightNode->creator == leftJoinBuddy) {
                 moveEntryFromFirstToSecond(newNode1, newNode2);
-                sepKey = (getMaxEntry(newNode1))->key;
+                sepKey = (getMaxEntry(newNode1))->getKey();
             }
         }
     }
@@ -929,10 +821,10 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
             break;
         case TT_INSERT:
             if ((newNode2 != nullptr) && (key < sepKey)) {
-                *result = InsertToChunk(newNode2, key, input);
+                *result = InsertToChunk(newNode2, key, input.data);
             }
             else {
-                *result = InsertToChunk(newNode1, key, input);
+                *result = InsertToChunk(newNode1, key, input.data);
             }
             break;
         case TT_REPLACE:
@@ -945,9 +837,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
             break;
         case TT_ENSLAVE:
             if (recovType == RT_COPY) {
-                // TODO сделать нормальное присвоение с объединёнными переменнами
-                newNode1->freezeState = SLAVE_FREEZE;
-                newNode1->joinBuddy = input;
+                newNode1->state = NodeState(SLAVE_FREEZE, input.data);
             }
         default:
             break;
@@ -963,18 +853,11 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
         }
     }
 
-    // TODO сделать нормальные сравнения с объединёнными переменными
-    if (newNode1->freezeState == SLAVE_FREEZE) {
-        // TODO сделать нормальное присвоение с объединёнными переменнами
-        LockFreeElement *m = newNode1->joinBuddy;
+    if (newNode1->getFreezeState() == SLAVE_FREEZE) {
+        LockFreeElement *m = newNode1->getJoinBuddy();
 
-        short int expState = REQUEST_SLAVE;
-        LockFreeElement *expJoinBuddy = oldNode;
-        // TODO сделать нормальный кас в вайл вставить
-        if ((m->freezeState == expState) && (m->joinBuddy == expJoinBuddy)) {
-            m->freezeState.compare_exchange_weak(expState, REQUEST_SLAVE);
-            m->joinBuddy.compare_exchange_weak(expJoinBuddy, newNode1);
-        }
+        NodeState expState(REQUEST_SLAVE, oldNode);
+        m->state.compare_exchange_weak(expState, NodeState(REQUEST_SLAVE, newNode1));
     }
     CallForUpdate(recovType, oldNode, key);
 
@@ -1041,12 +924,10 @@ short int LockFreeTree::getMaxKey(LockFreeElement *node) {
 }
 
 /*
- * TODO Получает две переменные с каким-то количеством битов, объединяет их в одно машинное слово с этим пока проблемы
  * Но судя по всему просто берёт ключ и ссылку на узел и делает запись, которая содержит их
  */
-LockFreeElement* LockFreeTree::combine(short int key, LockFreeElement *node) {
+EntryDataKey LockFreeTree::combine(short int key, LockFreeElement *node) {
 
-    return nullptr;
 }
 
 /*
@@ -1080,7 +961,15 @@ int LockFreeTree::getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt) {
 /*
  * Проверка на то заморожена ли запись
  */
-bool LockFreeTree::isFrozen(Entry *entry) {
+bool LockFreeTree::isFrozen(EntryDataKey dataKey) {
+
+    return false;
+}
+
+/*
+ * Проверка на то заморожена ли запись
+ */
+bool LockFreeTree::isFrozen(EntryNext dataKey) {
 
     return false;
 }
@@ -1096,14 +985,22 @@ bool LockFreeTree::isDeleted(Entry *entry) {
 /*
  * Вставка записи в данный чанк, для удобства передаётся ключ, возвращает код успешности
  */
-short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int key) {
+unsigned short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int key) {
+
+    return 0;
+}
+
+/*
+ * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
+ */
+EntryDataKey LockFreeTree::MarkFrozen(EntryDataKey dataKey) {
 
 }
 
 /*
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
-Entry* LockFreeTree::MarkFrozen(Entry* entry) {
+EntryNext LockFreeTree::MarkFrozen(EntryNext next) {
 
 }
 
@@ -1112,6 +1009,7 @@ Entry* LockFreeTree::MarkFrozen(Entry* entry) {
  */
 Entry* LockFreeTree::clearFrozen(Entry* entry) {
 
+    return nullptr;
 }
 
 /*
@@ -1215,15 +1113,13 @@ bool LockFreeTree::DecCount(LockFreeElement *node) {
 /*
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
-Entry* LockFreeTree::MarkDeleted(Entry* entry) {
+EntryNext LockFreeTree::MarkDeleted(EntryNext next) {
 
-    return nullptr;
 }
 
 /*
  * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
  */
-Entry* LockFreeTree::clearDeleted(Entry* entry) {
+EntryNext LockFreeTree::clearDeleted(EntryNext entry) {
 
-    return nullptr;
 }

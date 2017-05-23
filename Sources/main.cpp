@@ -1,8 +1,6 @@
 #include <iostream>
-#include <atomic>
 #include "../Headers/TreeFactory.h"
 #include "../Headers/Processing.h"
-#include "../Headers/Lock-Free/LockFreeElement.h"
 
 
 int main(int argc, char * argv[]) {
@@ -40,8 +38,6 @@ int main(int argc, char * argv[]) {
     tree->printValues();
 
     TreeFactory::getInstance()->clear();
-
-
 
     return 0;
 }

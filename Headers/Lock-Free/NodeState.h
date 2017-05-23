@@ -6,16 +6,16 @@ struct LockFreeElement;
 #pragma pack(push, 1)
 struct NodeState {
     LockFreeElement *joinBuddy;
-    unsigned short int state : 3;
+    unsigned short int freezeState : 3;
 
-    NodeState() noexcept : joinBuddy(nullptr), state(0) {
+    NodeState() noexcept : joinBuddy(nullptr), freezeState(0) {
     }
 
-    NodeState(short int state) noexcept : joinBuddy(nullptr), state(state) {
+    NodeState(unsigned short int freezeState) noexcept : joinBuddy(nullptr), freezeState(freezeState) {
     }
 
-    NodeState(short int state, LockFreeElement *joinBuddy) noexcept :
-            joinBuddy(joinBuddy), state(state)   {
+    NodeState(unsigned short int freezeState, LockFreeElement *joinBuddy) noexcept :
+            joinBuddy(joinBuddy), freezeState(freezeState)   {
     }
 };
 #pragma pack(pop)

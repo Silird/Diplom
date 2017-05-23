@@ -30,13 +30,8 @@ struct LockFreeElement {
     std::atomic<LockFreeElement*> neww;
     std::atomic<LockFreeElement*> nextNew;
 
-    /*
-     * TODO
-     * Переменные должны быть в 32 битах
-     * freezeState должно занимать 3 LSB бита у джоинБадди
-     */
-    std::atomic<LockFreeElement*> joinBuddy;
-    std::atomic<short int> freezeState;
+    // Состояние узла, состоит из ссылки на joinBuddy и кода состояния freezeState
+    std::atomic<NodeState> state;
 
     LockFreeElement(int range) {
         counter = 0;
@@ -45,14 +40,37 @@ struct LockFreeElement {
         creator = nullptr;
         neww = nullptr;
         nextNew = nullptr;
-        joinBuddy = nullptr;
-        freezeState = INFANT;
+        NodeState ns = state;
+        ns.joinBuddy = nullptr;
+        ns.freezeState = INFANT;
         std::cout << "LockFreeElement created!" << std::endl;
     }
 
     ~LockFreeElement() {
         delete chunk;
         std::cout << "LockFreeElement deleted!" << std::endl;
+    }
+
+    unsigned short int getFreezeState() {
+        NodeState ns = state;
+        return ns.freezeState;
+    }
+
+    LockFreeElement* getJoinBuddy() {
+        NodeState ns = state;
+        return ns.joinBuddy;
+    }
+
+    void setFreezeState(unsigned short int freezeState) {
+        NodeState ns = state;
+        ns.freezeState = freezeState;
+        state = ns;
+    }
+
+    void setFreezeState(LockFreeElement *joinBuddy) {
+        NodeState ns = state;
+        ns.joinBuddy = joinBuddy;
+        state = ns;
     }
 };
 

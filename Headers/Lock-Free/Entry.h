@@ -2,6 +2,8 @@
 #define DIPLOM_ENTRIE_H
 
 #include <atomic>
+#include "EntryDataKey.h"
+#include "EntryNext.h"
 
 class LockFreeElement;
 
@@ -9,30 +11,57 @@ const short int INF = 32767;
 const short int EMPTY = 32766;
 
 struct Entry {
-    short int key;
+    std::atomic<EntryDataKey> dataKey;
 
-    std::atomic<LockFreeElement*> data;
-
-    /*
-     * TODO
-     * Эти переменные должны быть в одной как бы
-     * 2 самых незначимых бита next должны быть фрозен и делитед
-     */
-    std::atomic<Entry*> next;
-    std::atomic<bool> frozen;
-    std::atomic<bool> deleted;
+    std::atomic<EntryNext> next;
 
     Entry() {
-        key = EMPTY;
-        data = nullptr;
-        next = nullptr;
-        frozen = false;
-        deleted = false;
+        EntryDataKey dK = dataKey;
+        dK.key = EMPTY;
+        dK.data = nullptr;
+        dK.freeze = false;
+        EntryNext n = next;
+        n.next = nullptr;
+        n.deletee = false;
+        n.freeze = false;
         std::cout << "Entry created!" << std::endl;
     }
 
     ~Entry() {
         std::cout << "Entry deleted!" << std::endl;
+    }
+
+    short int getKey() {
+        EntryDataKey dK = dataKey;
+        return dK.key;
+    }
+
+    LockFreeElement* getData() {
+        EntryDataKey dK = dataKey;
+        return dK.data;
+    }
+
+    Entry* getNext() {
+        EntryNext n = next;
+        return n.next;
+    }
+
+    void setKey(short int key) {
+        EntryDataKey dK = dataKey;
+        dK.key = key;
+        dataKey = dK;
+    }
+
+    void setData(LockFreeElement *data) {
+        EntryDataKey dK = dataKey;
+        dK.data = data;
+        dataKey = dK;
+    }
+
+    void setNext(Entry *next) {
+        EntryNext n = this->next;
+        n.next = next;
+        this->next = n;
     }
 };
 

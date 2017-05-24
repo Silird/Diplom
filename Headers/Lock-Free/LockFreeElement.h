@@ -42,12 +42,13 @@ struct LockFreeElement {
         NodeState ns = state.load(std::memory_order_relaxed);
         ns.joinBuddy = nullptr;
         ns.freezeState = INFANT;
-        std::cout << "LockFreeElement created!" << std::endl;
+        state = ns;
+        //std::cout << "LockFreeElement created!" << std::endl;
     }
 
     ~LockFreeElement() {
         delete chunk;
-        std::cout << "LockFreeElement deleted!" << std::endl;
+        //std::cout << "LockFreeElement deleted!" << std::endl;
     }
 
     unsigned short int getFreezeState() {

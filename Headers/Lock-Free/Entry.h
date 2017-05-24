@@ -8,7 +8,7 @@
 class LockFreeElement;
 
 const short int INF = 32767;
-const short int EMPTY = 32766;
+const short int EMPTY = -32767;
 
 struct Entry {
     std::atomic<EntryDataKey> dataKey;
@@ -20,15 +20,17 @@ struct Entry {
         dK.key = EMPTY;
         dK.data = nullptr;
         dK.freeze = false;
+        dataKey = dK;
         EntryNext n = next;
         n.next = nullptr;
         n.deletee = false;
         n.freeze = false;
-        std::cout << "Entry created!" << std::endl;
+        next = n;
+        //std::cout << "Entry created!" << std::endl;
     }
 
     ~Entry() {
-        std::cout << "Entry deleted!" << std::endl;
+        //std::cout << "Entry deleted!" << std::endl;
     }
 
     short int getKey() {

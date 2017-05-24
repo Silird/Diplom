@@ -137,7 +137,7 @@ void LockFreeTree::printValues(LockFreeElement *element) {
  */
 LockFreeElement* LockFreeTree::FindLeaf(short int key) {
     LockFreeElement *node = root;
-    while ( node->height != 0 ) {
+    while (node->height != 0 ) {
         FindResult findResult;
         Find(node->chunk, key, &findResult);
         node = findResult.cur.next->getData();
@@ -197,10 +197,10 @@ void LockFreeTree::InsertSplitNodes(LockFreeElement *node, short int sepKey) {
     }
 
     NodeState nodeStateExp(INFANT);
-    n1->state.compare_exchange_weak(nodeStateExp, NodeState(NORMAL));
+    CAS(&n1->state, nodeStateExp, NodeState(NORMAL));
     nodeStateExp.freezeState = INFANT;
     nodeStateExp.joinBuddy = nullptr;
-    n2->state.compare_exchange_weak(nodeStateExp, NodeState(NORMAL));
+    CAS(&n2->state, nodeStateExp, NodeState(NORMAL));
 
     return;
 }
@@ -227,7 +227,7 @@ LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeEl
         expState = NodeState(REQUEST_SLAVE, oldSlave);
     }
 
-    if (!master->state.compare_exchange_weak(expState, NodeState(REQUEST_SLAVE, slave))) {
+    if (CAS(&master->state, expState, NodeState(REQUEST_SLAVE, slave))) {
         if (master->getFreezeState() == JOIN) {
             return master->getJoinBuddy();
         }
@@ -244,7 +244,7 @@ LockFreeElement* LockFreeTree::FindJoinSlave(LockFreeElement *master, LockFreeEl
 
     expState.freezeState = REQUEST_SLAVE;
     expState.joinBuddy = slave;
-    master->state.compare_exchange_weak(expState, NodeState(JOIN, slave));
+    CAS(&master->state, expState, NodeState(JOIN, slave));
 
     if (master->getFreezeState() == JOIN) {
         return slave;
@@ -261,7 +261,7 @@ bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, sho
               short int slaveKey) {
 
     NodeState expState(NORMAL);
-    if (!master->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, master))) {
+    if (!CAS(&master->state, expState, NodeState(SLAVE_FREEZE, master))) {
         if (slave->getFreezeState() == INFANT) {
             helpInfant(slave);
             return false;
@@ -275,13 +275,13 @@ bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, sho
                     expState.joinBuddy = slave;
                     // TODO ??? expState = REQUEST_SLAVE, slave;
 
-                    return master->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, slave));
+                    return CAS(&master->state, expState, NodeState(SLAVE_FREEZE, slave));
                 }
                 else {
                     expState.freezeState = REQUEST_SLAVE;
                     expState.joinBuddy = master;
 
-                    return slave->state.compare_exchange_weak(expState, NodeState(SLAVE_FREEZE, master));
+                    return CAS(&slave->state, expState, NodeState(SLAVE_FREEZE, master));
                 }
             }
             bool result;
@@ -351,10 +351,10 @@ void LockFreeTree::InsertBorrowNodes(LockFreeElement *master, short int sepKey) 
     }
 
     NodeState expState(INFANT);
-    n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    CAS(&n1->state, expState, NodeState(NORMAL));
     expState.freezeState = INFANT;
     expState.joinBuddy = nullptr;
-    n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    CAS(&n2->state, expState, NodeState(NORMAL));
 
     return;
 }
@@ -407,7 +407,7 @@ void LockFreeTree::InsertMergeNode(LockFreeElement *master) {
     }
 
     NodeState expState(INFANT);
-    neww->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    CAS(&neww->state, expState, NodeState(NORMAL));
 }
 
 /*
@@ -420,11 +420,11 @@ void LockFreeTree::CallForUpdate(unsigned short int freezeState, LockFreeElement
     LockFreeElement *n1 = node->neww;
     LockFreeElement *n2 = node->neww.load(std::memory_order_relaxed)->nextNew;
     switch (freezeState) {
-        case COPY: {
+        case RT_COPY: {
             LockFreeElement *parent;
             Entry *nodeEnt;
             if (node == root) {
-                root.compare_exchange_weak(node, n1);
+                CAS(&root, node, n1);
             }
             else if ((parent = FindParent(node->chunk->getHead()->getNext()->getKey(),
                                           node, &nodeEnt, nullptr)) != nullptr) {
@@ -433,11 +433,11 @@ void LockFreeTree::CallForUpdate(unsigned short int freezeState, LockFreeElement
             }
 
             NodeState expState(INFANT);
-            n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+            CAS(&n1->state, expState, NodeState(NORMAL));
 
             return;
         }
-        case SPLIT: {
+        case RT_SPLIT: {
             if (node == root) {
                 SplitRoot(node, sepKey, n1, n2);
             } else {
@@ -445,7 +445,7 @@ void LockFreeTree::CallForUpdate(unsigned short int freezeState, LockFreeElement
             }
             return;
         }
-        case JOIN: {
+        case RT_MERGE: {
             if (n2 == nullptr) {
                 InsertMergeNode(node);
             } else {
@@ -474,17 +474,17 @@ void LockFreeTree::helpInfant(LockFreeElement *node) {
     if (n1->getFreezeState() != INFANT) {
         if (n2) {
             NodeState expState(INFANT);
-            n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
+            CAS(&n2->state, expState, NodeState(NORMAL));
         }
         return;
     }
     if ((creator == root) && (creatorFrSt == SPLIT)) {
 
         NodeState expState(INFANT);
-        n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+        CAS(&n1->state, expState, NodeState(NORMAL));
         expState.freezeState = INFANT;
         expState.joinBuddy = nullptr;
-        n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
+        CAS(&n2->state, expState, NodeState(NORMAL));
 
         return;
     }
@@ -492,7 +492,7 @@ void LockFreeTree::helpInfant(LockFreeElement *node) {
     switch (creatorFrSt) {
         case COPY: {
             NodeState expState(INFANT);
-            node->state.compare_exchange_weak(expState, NodeState(NORMAL));
+            CAS(&node->state, expState, NodeState(NORMAL));
 
             return;
         }
@@ -525,13 +525,13 @@ void LockFreeTree::SplitRoot(LockFreeElement *oldRoot, short int sepKey, LockFre
     newRoot->height = oldRoot->height + 1;
     addRootSons(newRoot, sepKey, n1, INF, n2);
 
-    root.compare_exchange_weak(oldRoot, newRoot);
+    CAS(&root, oldRoot, newRoot);
 
     NodeState expState(INFANT);
-    n1->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    CAS(&n1->state, expState, NodeState(NORMAL));
     expState.freezeState = INFANT;
     expState.joinBuddy = nullptr;
-    n2->state.compare_exchange_weak(expState, NodeState(NORMAL));
+    CAS(&n2->state, expState, NodeState(NORMAL));
 
     return;
 }
@@ -549,7 +549,7 @@ void LockFreeTree::MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleN
         return;
     }
     if ((firstEnt.getData() == c1) && (secondEnt.getData() == posibleNewRoot)) {
-        root.compare_exchange_weak(oldRoot, posibleNewRoot);
+        CAS(&root, oldRoot, posibleNewRoot);
     }
     return;
 }
@@ -564,7 +564,7 @@ bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, EntryDat
     if (!Find(node->chunk, key, &findResult)) {
         return false;
     }
-    if (!findResult.cur.next->dataKey.compare_exchange_weak(exp, neww)) {
+    if (!CAS(&findResult.cur.next->dataKey, exp, neww)) {
         if (isFrozen(findResult.cur.next->dataKey)) {
             bool result;
 
@@ -611,12 +611,12 @@ void LockFreeTree::MarkChunkFrozen(Chunk *chunk) {
 
         EntryNext savedNext = current->next;
         while (!isFrozen(savedNext)) {
-            current->next.compare_exchange_weak(savedNext, MarkFrozen(savedNext));
+            CAS(&current->next, savedNext, MarkFrozen(savedNext));
             savedNext = current->next;
         }
         EntryDataKey savedDataKey = current->dataKey;
         while (!isFrozen(savedDataKey)) {
-            current->dataKey.compare_exchange_weak(savedDataKey, MarkFrozen(savedDataKey));
+            CAS(&current->dataKey, savedDataKey, MarkFrozen(savedDataKey));
             savedDataKey = current->dataKey;
         }
     }
@@ -652,7 +652,7 @@ unsigned short int LockFreeTree::FreezeDecision(Chunk *chunk) {
 Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
                             EntryDataKey data, unsigned short int tgr, bool *res) {
     NodeState expState(NORMAL);
-    node->state.compare_exchange_weak(expState, NodeState(FREEZE));
+    CAS(&node->state, expState, NodeState(FREEZE));
 
     unsigned short int decision = RT_MERGE;
     LockFreeElement *mergePartner = nullptr;
@@ -690,7 +690,7 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey e
 
             expState.freezeState = REQUEST_SLAVE;
             expState.joinBuddy = mergePartner;
-            node->state.compare_exchange_weak(expState, NodeState(JOIN, mergePartner));
+            CAS(&node->state, expState, NodeState(JOIN, mergePartner));
             break;
         }
         case FREEZE: {
@@ -702,13 +702,13 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey e
                 case RT_COPY: {
                     expState.freezeState = FREEZE;
                     expState.joinBuddy = nullptr;
-                    node->state.compare_exchange_weak(expState, NodeState(COPY));
+                    CAS(&node->state, expState, NodeState(COPY));
                     break;
                 }
                 case RT_SPLIT: {
                     expState.freezeState = FREEZE;
                     expState.joinBuddy = nullptr;
-                    node->state.compare_exchange_weak(expState, NodeState(SPLIT));
+                    CAS(&node->state, expState, NodeState(SPLIT));
                     break;
                 }
                 case RT_MERGE: {
@@ -719,7 +719,7 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey e
 
                         expState.freezeState = REQUEST_SLAVE;
                         expState.joinBuddy = mergePartner;
-                        node->state.compare_exchange_weak(expState, NodeState(JOIN, mergePartner));
+                        CAS(&node->state, expState, NodeState(JOIN, mergePartner));
                     }
                     break;
                 }
@@ -752,6 +752,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     short int sepKey = INF;
     LockFreeElement *newNode1 = Allocate();
     newNode1->creator = oldNode;
+    newNode1->height = oldNode->height;
     LockFreeElement *newNode2 = nullptr;
 
     switch (recovType) {
@@ -768,6 +769,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
                 newNode2 = Allocate();
                 newNode1->nextNew = newNode2;
                 newNode2->creator = oldNode;
+                newNode2->height = oldNode->height;
                 sepKey = mergeToTwoNodes(oldNode, mergePartner, newNode1, newNode2);
             } else {
                 mergeToOneNode(oldNode, mergePartner, newNode1);
@@ -778,6 +780,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
             newNode2 = Allocate();
             newNode1->nextNew = newNode2;
             newNode2->creator = oldNode;
+            newNode2->height = oldNode->height;
             sepKey = splitIntoTwoNodes(oldNode, newNode1, newNode2);
             break;
         }
@@ -818,7 +821,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
             }
             break;
         case TT_INSERT:
-            if ((newNode2 != nullptr) && (key < sepKey)) {
+            if ((newNode2 != nullptr) && (key > sepKey)) {
                 *result = InsertToChunk(newNode2, key, input.data);
             }
             else {
@@ -842,7 +845,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     }
 
     LockFreeElement *tmp = nullptr;
-    if (!oldNode->neww.compare_exchange_weak(tmp, newNode1)) {
+    if (!CAS(&oldNode->neww, tmp, newNode1)) {
         if (key <= sepKey) {
             retNode = oldNode->neww;
         }
@@ -855,9 +858,9 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
         LockFreeElement *m = newNode1->getJoinBuddy();
 
         NodeState expState(REQUEST_SLAVE, oldNode);
-        m->state.compare_exchange_weak(expState, NodeState(REQUEST_SLAVE, newNode1));
+        CAS(&m->state, expState, NodeState(REQUEST_SLAVE, newNode1));
     }
-    CallForUpdate(recovType, oldNode, key);
+    CallForUpdate(recovType, oldNode, sepKey);
 
     Chunk *resultChunk = nullptr;
     if (retNode != nullptr) {
@@ -891,7 +894,7 @@ bool LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
             if (isFrozen(findResult->cur)) {
                 MarkFrozen(findResult->next);
             }
-            if (!findResult->prev->compare_exchange_weak(findResult->cur, clearDeleted(findResult->next))) {
+            if (!CAS(findResult->prev, findResult->cur, clearDeleted(findResult->next))) {
                 return Find(chunk, key, findResult);
             }
             RetireEntry(findResult->cur.next);
@@ -938,9 +941,9 @@ bool LockFreeTree::InsertToChunk(LockFreeElement *node, short int key, LockFreeE
         if (chunk == nullptr) {
             return result;
         }
-        current = AllocateEntry(chunk, key, data);
+        current = AllocateEntry(node->chunk, key, data);
     }
-    unsigned  short int returnCode = InsertEntry(node->chunk, current, key);
+    unsigned short int returnCode = InsertEntry(node->chunk, current, key);
     switch (returnCode) {
         case IC_SUCCESS_THIS: {
             IncCount(node);
@@ -983,7 +986,7 @@ bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
         clearedNext.freeze = false;
         clearedNext.deletee = false;
 
-        if (!findResult.cur.next->next.compare_exchange_weak(clearedNext, MarkDeleted(clearedNext))) {
+        if (!CAS(&findResult.cur.next->next, clearedNext, MarkDeleted(clearedNext))) {
             if (isFrozen(findResult.cur.next->next)) {
                 IncCount(node);
                 bool result;
@@ -1000,7 +1003,7 @@ bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
         if (isFrozen(findResult.next)) {
             MarkFrozen(findResult.next);
         }
-        if (findResult.prev->compare_exchange_weak(findResult.cur, findResult.next)) {
+        if (CAS(findResult.prev, findResult.cur, findResult.next)) {
             RetireEntry(findResult.next.next);
         }
         else {
@@ -1063,11 +1066,12 @@ int LockFreeTree::getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt) {
     Entry *current = chunk->getHead()->getNext();
     firstEnt = current;
     secondEnt = nullptr;
-    while (current->getNext() != nullptr) {
+    while (current != nullptr) {
         if (counter == 1) {
             secondEnt = current;
         }
         counter++;
+        current = current->getNext();
     }
 
     return counter;
@@ -1109,24 +1113,24 @@ unsigned short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int k
                 return IC_EXISTED;
             }
         }
+        EntryNext savedCur = findResult.cur;
         if (isFrozen(savedNext)) {
-            // TODO ???
-            MarkFrozen(findResult.cur.next->dataKey);
-        }
-        if (isFrozen(findResult.cur.next->dataKey)) {
-            MarkFrozen(e->dataKey);
+            MarkFrozen(findResult.cur);
         }
         EntryNext entryNext;
         entryNext.next = findResult.cur.next;
         entryNext.freeze = false;
         entryNext.deletee = false;
-        if (!e->next.compare_exchange_weak(savedNext, entryNext)) {
+        if (isFrozen(findResult.cur)) {
+            MarkFrozen(entryNext);
+        }
+        if (!CAS(&e->next, savedNext, entryNext)) {
             continue;
         }
         entryNext.next = e;
         entryNext.freeze = false;
         entryNext.deletee = false;
-        if (!findResult.prev->compare_exchange_weak(findResult.cur, entryNext)) {
+        if (!CAS(findResult.prev, savedCur, entryNext)) {
             continue;
         }
         return IC_SUCCESS_THIS;
@@ -1137,7 +1141,6 @@ unsigned short int LockFreeTree::InsertEntry(Chunk *chunk, Entry *e, short int k
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryDataKey LockFreeTree::MarkFrozen(EntryDataKey dataKey) {
-    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
     dataKey.freeze = true;
     return dataKey;
 }
@@ -1146,7 +1149,6 @@ EntryDataKey LockFreeTree::MarkFrozen(EntryDataKey dataKey) {
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryNext LockFreeTree::MarkFrozen(EntryNext next) {
-    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
     next.freeze = true;
     return next;
 }
@@ -1155,7 +1157,6 @@ EntryNext LockFreeTree::MarkFrozen(EntryNext next) {
  * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
  */
 Entry* LockFreeTree::clearFrozen(Entry* entry) {
-    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
     if (entry == nullptr) {
         return nullptr;
     }
@@ -1174,7 +1175,28 @@ Entry* LockFreeTree::clearFrozen(Entry* entry) {
  * Копирует содержимое чанка oldNode в newNode
  */
 void LockFreeTree::copyToOneChunkNode(LockFreeElement *oldNode, LockFreeElement* newNode) {
-    // TODO
+    Entry *current = oldNode->chunk->getHead()->getNext();
+    while (current != nullptr) {
+        Entry *tmp = AllocateEntry(newNode->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
 }
 
 /*
@@ -1190,8 +1212,109 @@ void LockFreeTree::copyToOneChunkNode(LockFreeElement *oldNode, LockFreeElement*
  */
 short int LockFreeTree::mergeToTwoNodes(LockFreeElement *oldNode, LockFreeElement *mergePartner,
                           LockFreeElement *newNode1, LockFreeElement *newNode2) {
-    // TODO
-    return 0;
+    short int maxMasterKey = getMaxKey(oldNode);
+    short int maxSlaveKey = getMaxKey(mergePartner);
+
+    LockFreeElement *oldHigh;
+    LockFreeElement *oldLow;
+    if (maxSlaveKey < maxMasterKey) {
+        oldHigh = oldNode;
+        oldLow = mergePartner;
+    }
+    else {
+        oldHigh = mergePartner;
+        oldLow = oldNode;
+    }
+
+    Entry *current = oldLow->chunk->getHead()->getNext();
+    while (current != nullptr) {
+        if ((current->getNext() == nullptr) && (oldLow == mergePartner)) {
+            Entry *tmp = AllocateEntry(newNode2->chunk, current->getKey(), current->getData());
+            unsigned short int insertResult = InsertEntry(newNode2->chunk, tmp, current->getKey());
+            switch (insertResult) {
+                case IC_SUCCESS_THIS: {
+                    IncCount(newNode2);
+                    break;
+                }
+                case IC_SUCCESS_OTHER: {
+                    break;
+                }
+                case IC_EXISTED: {
+                    ClearEntry(newNode2, tmp);
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            current = current->getNext();
+        }
+        Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode1);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode1, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
+
+    current = oldLow->chunk->getHead()->getNext();
+    if (oldHigh == mergePartner) {
+        Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode1);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode1, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
+    while (current != nullptr) {
+        Entry *tmp = AllocateEntry(newNode2->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode2->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode2);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode2, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
+
+    return getMaxKey(newNode1);
 }
 
 /*
@@ -1199,7 +1322,52 @@ short int LockFreeTree::mergeToTwoNodes(LockFreeElement *oldNode, LockFreeElemen
  */
 void LockFreeTree::mergeToOneNode(LockFreeElement *oldNode, LockFreeElement *mergePartner,
                     LockFreeElement *newNode) {
-    // TODO
+    Entry *current = oldNode->chunk->getHead()->getNext();
+    while (current != nullptr) {
+        Entry *tmp = AllocateEntry(newNode->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
+
+
+    current = mergePartner->chunk->getHead()->getNext();
+    while (current != nullptr) {
+        Entry *tmp = AllocateEntry(newNode->chunk, current->getKey(), current->getData());
+        unsigned short int insertResult = InsertEntry(newNode->chunk, tmp, current->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(newNode);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(newNode, tmp);
+                break;
+            }
+            default:
+                break;
+        }
+
+        current = current->getNext();
+    }
 }
 
 /*
@@ -1210,8 +1378,61 @@ void LockFreeTree::mergeToOneNode(LockFreeElement *oldNode, LockFreeElement *mer
  */
 short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElement *newNode1,
                             LockFreeElement *newNode2) {
-    // TODO
-    return 0;
+    Entry *first = nullptr;
+    Entry *second = nullptr;
+    int entNum = getEntNum(oldNode->chunk, first, second);
+    int sepNum = entNum/2;
+    short int sepKey = 0;
+
+    Entry *current = oldNode->chunk->getHead()->getNext();
+    while (current != nullptr) {
+        if (sepNum >= 0) {
+            Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
+            unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
+            switch (insertResult) {
+                case IC_SUCCESS_THIS: {
+                    IncCount(newNode1);
+                    break;
+                }
+                case IC_SUCCESS_OTHER: {
+                    break;
+                }
+                case IC_EXISTED: {
+                    ClearEntry(newNode1, tmp);
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        else {
+            Entry *tmp = AllocateEntry(newNode2->chunk, current->getKey(), current->getData());
+            unsigned short int insertResult = InsertEntry(newNode2->chunk, tmp, current->getKey());
+            switch (insertResult) {
+                case IC_SUCCESS_THIS: {
+                    IncCount(newNode2);
+                    break;
+                }
+                case IC_SUCCESS_OTHER: {
+                    break;
+                }
+                case IC_EXISTED: {
+                    ClearEntry(newNode2, tmp);
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
+        if (sepNum == 0) {
+            sepKey = current->getKey();
+        }
+        sepNum--;
+        current = current->getNext();
+    }
+
+    return sepKey;
 }
 
 /*
@@ -1219,7 +1440,33 @@ short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElem
  * в second
  */
 void LockFreeTree::moveEntryFromFirstToSecond(LockFreeElement *first, LockFreeElement *second) {
-    // TODO
+    Entry *relocate = first->chunk->getHead()->getNext();
+    EntryNext savedNext = relocate->next;
+    if (!isDeleted(savedNext)) {
+        if (!CAS(&relocate->next, savedNext, MarkDeleted(savedNext))) {
+            return;
+        }
+
+        Entry *insert = AllocateEntry(second->chunk, relocate->getKey(), relocate->getData());
+
+        unsigned short int insertResult = InsertEntry(second->chunk, insert, insert->getKey());
+        switch (insertResult) {
+            case IC_SUCCESS_THIS: {
+                IncCount(second);
+                break;
+            }
+            case IC_SUCCESS_OTHER: {
+                break;
+            }
+            case IC_EXISTED: {
+                ClearEntry(second, insert);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
 }
 
 /*
@@ -1242,8 +1489,11 @@ Entry* LockFreeTree::AllocateEntry(Chunk *chunk, short int key, LockFreeElement 
     EntryDataKey expecEnt = combine(EMPTY, nullptr);
     for (int i = 0; i < chunk->entries.size(); i++) {
         Entry *current = chunk->entries[i];
+        if (current->dataKey.load(std::memory_order_relaxed) == keyData) {
+            return current;
+        }
         if (current->dataKey.load(std::memory_order_relaxed) == expecEnt) {
-            if (current->dataKey.compare_exchange_weak(expecEnt, keyData)) {
+            if (CAS(&current->dataKey, expecEnt, keyData)) {
                 return current;
             }
         }
@@ -1255,7 +1505,19 @@ Entry* LockFreeTree::AllocateEntry(Chunk *chunk, short int key, LockFreeElement 
  * Удаляет помеченную как удалённую запись из списка
  */
 void LockFreeTree::RetireEntry(Entry *entry) {
-    // TODO
+    // TODO Реализация под вопросом
+    if ((!isFrozen(entry->dataKey)) && (!isFrozen(entry->next))) {
+        EntryDataKey savedKeyData = clearFrozen(entry)->dataKey;
+        EntryNext savedNext = clearFrozen(entry)->next;
+        EntryDataKey newKeyData = combine(EMPTY, nullptr);
+        EntryNext newNext;
+        newNext.next = nullptr;
+        newNext.freeze = false;
+        newNext.deletee = false;
+        if (CAS(&entry->next, savedNext, newNext)) {
+            CAS(&entry->dataKey, savedKeyData, newKeyData);
+        }
+    }
 }
 
 /*
@@ -1269,8 +1531,8 @@ bool LockFreeTree::ClearEntry(LockFreeElement *node, Entry *entry) {
     newNext.next = nullptr;
     newNext.freeze = false;
     newNext.deletee = false;
-    if (entry->next.compare_exchange_weak(savedNext, newNext)) {
-        if (entry->dataKey.compare_exchange_weak(savedKeyData, newKeyData)) {
+    if (CAS(&entry->next, savedNext, newNext)) {
+        if (CAS(&entry->dataKey, savedKeyData, newKeyData)) {
             return true;
         }
     }
@@ -1291,7 +1553,7 @@ bool LockFreeTree::ClearEntry(LockFreeElement *node, Entry *entry) {
 void LockFreeTree::IncCount(LockFreeElement *node) {
     while (true) {
         int counter = node->counter;
-        if (node->counter.compare_exchange_weak(counter, counter + 1)) {
+        if (CAS(&node->counter, counter, counter + 1)) {
             return;
         }
     }
@@ -1306,7 +1568,7 @@ bool LockFreeTree::DecCount(LockFreeElement *node) {
         if (counter == MIN) {
             return false;
         }
-        if (node->counter.compare_exchange_weak(counter, counter - 1)) {
+        if (CAS(&node->counter, counter, counter - 1)) {
             return true;
         }
     }
@@ -1316,7 +1578,6 @@ bool LockFreeTree::DecCount(LockFreeElement *node) {
  * Помечает переданную запись как зафриженую, возвращает эту же запись для удобства
  */
 EntryNext LockFreeTree::MarkDeleted(EntryNext next) {
-    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
     next.deletee = true;
     return next;
 }
@@ -1325,7 +1586,6 @@ EntryNext LockFreeTree::MarkDeleted(EntryNext next) {
  * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
  */
 EntryNext LockFreeTree::clearDeleted(EntryNext next) {
-    // TODO Посмотреть как оно вообще применяется, такое ощущение что дожно касом менятсья потом
     next.deletee = false;
     return next;
 }

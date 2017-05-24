@@ -1,6 +1,8 @@
 #include <iostream>
 #include "../Headers/TreeFactory.h"
 #include "../Headers/Processing.h"
+#include "../Headers/Lock-Free/NodeState.h"
+#include "../Headers/Lock-Free/LockFreeElement.h"
 
 
 int main(int argc, char * argv[]) {
@@ -19,7 +21,7 @@ int main(int argc, char * argv[]) {
     int R = atoi(argv[3]); // Range количество ссылок у B-дерева
     std::cout << "R = " << R << std::endl;
 
-    /*
+
     Processing *processing;
     for (int cores = 1; cores <= C; cores++) {
         TreeFactory::getInstance(R)->getTree();
@@ -30,14 +32,53 @@ int main(int argc, char * argv[]) {
 
         TreeFactory::getInstance()->clear();
     }
-     */
 
+
+    /*
     ITree *tree = TreeFactory::getInstance(R)->getTree();
+
 
     tree->print();
     tree->printValues();
 
+    std::cout << tree->search(10) << std::endl;
+
+    tree->add(10);
+    tree->print();
+
+    std::cout << tree->search(10) << std::endl;
+
+    tree->add(20);
+    tree->print();
+
+    tree->add(30);
+    tree->print();
+
+    tree->add(40);
+    tree->print();
+
+    tree->add(50);
+    tree->print();
+
+    tree->add(60);
+    tree->print();
+
+    tree->add(70);
+    tree->print();
+
+    tree->add(80);
+    tree->print();
+
+
+    std::cout << tree->search(60) << std::endl;
+    std::cout << tree->search(65) << std::endl;
+
+    tree->remove(80);
+    tree->print();
+
+
     TreeFactory::getInstance()->clear();
+    */
 
     return 0;
 }

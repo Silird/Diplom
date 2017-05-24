@@ -342,6 +342,20 @@ private:
      * Снимает пометку о зафриженности у переданной записи, возвращает эту же запись для удобства
      */
     EntryNext clearDeleted(EntryNext next);
+
+    /*
+     * CAS
+     */
+    template <typename T>
+    bool CAS(std::atomic<T> *value, T &exp, T neww) {
+        T tmp = exp;
+        while (!value->compare_exchange_weak(tmp, neww)) {
+            if (value->load(std::memory_order_relaxed) != exp) {
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 

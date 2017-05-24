@@ -17,6 +17,14 @@ struct NodeState {
     NodeState(unsigned short int freezeState, LockFreeElement *joinBuddy) noexcept :
             joinBuddy(joinBuddy), freezeState(freezeState)   {
     }
+
+    bool operator == (const NodeState &state) {
+        return ((joinBuddy == state.joinBuddy) && (freezeState == state.freezeState));
+    }
+
+    bool operator != (const NodeState &state) {
+        return !((joinBuddy == state.joinBuddy) && (freezeState == state.freezeState));
+    }
 };
 //#pragma pack(pop)
 

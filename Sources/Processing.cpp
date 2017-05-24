@@ -15,29 +15,31 @@ Processing::Processing(int N, int C) {
 void Processing::start() {
     ITree *tree = TreeFactory::getInstance()->getTree();
 
-    int limit = 100;
+    short int limit = 100;
     for (int i = 0; i < N/C; i++) {
         //std::cout << "Operation " << i << std::endl;
         switch (rand() % 7) {
             case 0: {
             }
             case 1: {
+                /*
                 int number = rand() % limit;
                 std::cout << "(" << i << ") Remove " << number << std::endl;
                 tree->remove(number);
+                 */
                 break;
             }
             case 2: {
             }
             case 3: {
-                int number = rand() % limit;
-                std::cout << "(" << i << ") Search " << number << std::endl;
+                short int number = rand() % limit;
+                //std::cout << "(" << i << ") Search " << number << std::endl;
                 tree->search(number);
                 break;
             }
             default: {
-                int number = rand() % limit;
-                std::cout << "(" << i << ") Add " << number << std::endl;
+                short int number = rand() % limit;
+                //std::cout << "(" << i << ") Add " << number << std::endl;
                 tree->add(number);
                 break;
             }

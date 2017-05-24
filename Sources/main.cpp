@@ -33,6 +33,12 @@ int main(int argc, char * argv[]) {
         TreeFactory::getInstance()->clear();
     }
 
+    /*
+    ITree *tree = TreeFactory::getInstance(R)->getTree();
+
+
+    TreeFactory::getInstance()->clear();
+*/
 
     /*
     ITree *tree = TreeFactory::getInstance(R)->getTree();
@@ -48,6 +54,8 @@ int main(int argc, char * argv[]) {
 
     std::cout << tree->search(10) << std::endl;
 
+    //tree->remove(10);
+    //tree->print();
     tree->add(20);
     tree->print();
 
@@ -74,6 +82,9 @@ int main(int argc, char * argv[]) {
     std::cout << tree->search(65) << std::endl;
 
     tree->remove(80);
+    tree->print();
+
+    tree->remove(70);
     tree->print();
 
 

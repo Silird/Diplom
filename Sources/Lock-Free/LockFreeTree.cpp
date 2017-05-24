@@ -159,11 +159,14 @@ LockFreeElement* LockFreeTree::FindParent(short int key, LockFreeElement *childN
         if (childNode == findResult.cur.next->getData()) {
             *prntEnt = findResult.cur.next;
             if (slaveEnt != nullptr) {
-                if (findResult.prev == &(node->chunk->head)) {
+                //std::atomic<EntryNext> *tmp1 = findResult.prev;
+                //std::atomic<EntryNext> *tmp2 = &(node->chunk->head);
+                //if (findResult.prev == &(node->chunk->head)) {
+                if (findResult.normalPrev == node->chunk->head) {
                     *slaveEnt = findResult.next.next;
                 }
                 else {
-                    *slaveEnt = EntPtr(findResult.prev);
+                    *slaveEnt = findResult.normalPrev.next;
                 }
             }
             if (node->getFreezeState() == INFANT) {
@@ -261,7 +264,7 @@ bool LockFreeTree::SetSlave(LockFreeElement *master, LockFreeElement *slave, sho
               short int slaveKey) {
 
     NodeState expState(NORMAL);
-    if (!CAS(&master->state, expState, NodeState(SLAVE_FREEZE, master))) {
+    if (!CAS(&slave->state, expState, NodeState(SLAVE_FREEZE, master))) {
         if (slave->getFreezeState() == INFANT) {
             helpInfant(slave);
             return false;
@@ -541,14 +544,14 @@ void LockFreeTree::SplitRoot(LockFreeElement *oldRoot, short int sepKey, LockFre
  */
 void LockFreeTree::MergeRoot(LockFreeElement *oldRoot, LockFreeElement *posibleNewRoot,
                LockFreeElement * c1, short int c1Key) {
-    Entry firstEnt;
-    Entry secondEnt;
+    Entry *firstEnt;
+    Entry *secondEnt;
     int rootEntNum = getEntNum(oldRoot->chunk, &firstEnt, &secondEnt);
     if (rootEntNum > 2) {
         DeleteInChunk(oldRoot, c1Key);
         return;
     }
-    if ((firstEnt.getData() == c1) && (secondEnt.getData() == posibleNewRoot)) {
+    if ((firstEnt->getData() == c1) && (secondEnt->getData() == posibleNewRoot)) {
         CAS(&root, oldRoot, posibleNewRoot);
     }
     return;
@@ -568,8 +571,8 @@ bool LockFreeTree::ReplaceInChunk(LockFreeElement *node, short int key, EntryDat
         if (isFrozen(findResult.cur.next->dataKey)) {
             bool result;
 
-            Chunk *tmpChunk = Freeze(node, key, exp, neww, TT_REPLACE , &result);
-            if (tmpChunk == nullptr) {
+            node = Freeze(node, key, exp, neww, TT_REPLACE , &result);
+            if (node == nullptr) {
                 return result;
             }
         }
@@ -633,7 +636,8 @@ unsigned short int LockFreeTree::FreezeDecision(Chunk *chunk) {
         cnt++;
         e = e->getNext();
     }
-    if (cnt <= MIN) {
+    std::cout << "(" << chunk << ") Count for " << cnt << std::endl;
+    if ((cnt <= MIN)) {
         return RT_MERGE;
     }
     if (cnt >= MAX) {
@@ -649,7 +653,7 @@ unsigned short int LockFreeTree::FreezeDecision(Chunk *chunk) {
  * Обозначение всех входных данных смотри в FreezeRecovery,
  * так как он является логическим продолжением
  */
-Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
+LockFreeElement* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
                             EntryDataKey data, unsigned short int tgr, bool *res) {
     NodeState expState(NORMAL);
     CAS(&node->state, expState, NodeState(FREEZE));
@@ -730,7 +734,7 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey e
         default:
             break;
     }
-    return FreezeRecovery(node, key, expected, data, decision, mergePartner, tgr, res);
+    return FreezeRecovery(node, key, expected, data, decision, tgr, res);
 }
 
 /*
@@ -744,9 +748,9 @@ Chunk* LockFreeTree::Freeze(LockFreeElement *node, short int key, EntryDataKey e
  * так как в данном случае мы сразу заканчиваем порабощение узла для мёрджа узла)
  * в result записывается успешность всей вставки узла
  */
-Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
+LockFreeElement* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
                                     EntryDataKey expected, EntryDataKey input,
-                                    unsigned short int recovType, LockFreeElement *mergePartner,
+                                    unsigned short int recovType,
                                     unsigned short int trigger, bool *result) {
     LockFreeElement *retNode = nullptr;
     short int sepKey = INF;
@@ -761,11 +765,12 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
             break;
         }
         case RT_MERGE: {
-            Entry firstEnt;
-            Entry secondEnt;
+            Entry *firstEnt;
+            Entry *secondEnt;
+            LockFreeElement *mergePartner = oldNode->getJoinBuddy();
             int numberEnt = getEntNum(oldNode->chunk, &firstEnt, &secondEnt) +
                             getEntNum(mergePartner->chunk, &firstEnt, &secondEnt);
-            if (numberEnt >= MAX) {
+            if (numberEnt > MAX) {
                 newNode2 = Allocate();
                 newNode1->nextNew = newNode2;
                 newNode2->creator = oldNode;
@@ -862,12 +867,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
     }
     CallForUpdate(recovType, oldNode, sepKey);
 
-    Chunk *resultChunk = nullptr;
-    if (retNode != nullptr) {
-        resultChunk = retNode->chunk;
-    }
-
-    return resultChunk;
+    return retNode;
 }
 
 // те, которые не известны ==========================================================================
@@ -883,6 +883,7 @@ Chunk* LockFreeTree::FreezeRecovery(LockFreeElement *oldNode, short int key,
  * Сделана структура FindResult, которая содержит результаты
  */
 bool LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
+    findResult->normalPrev.next = nullptr;
     findResult->prev = &(chunk->head);
     findResult->cur = chunk->head;
     while (clearFrozen(findResult->cur.next) != nullptr) {
@@ -909,6 +910,7 @@ bool LockFreeTree::Find(Chunk *chunk, short int key, FindResult *findResult) {
                 return (ckey == key);
             }
             findResult->prev = &(findResult->cur.next->next);
+            findResult->normalPrev = findResult->cur;
             findResult->cur = findResult->next;
         }
     }
@@ -937,8 +939,8 @@ bool LockFreeTree::InsertToChunk(LockFreeElement *node, short int key, LockFreeE
     Entry *current = AllocateEntry(node->chunk, key, data);
     bool result = false;
     while (current == nullptr) {
-        Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(key, data), TT_INSERT, &result);
-        if (chunk == nullptr) {
+        node = Freeze(node, key, combine(EMPTY, nullptr), combine(key, data), TT_INSERT, &result);
+        if (node == nullptr) {
             return result;
         }
         current = AllocateEntry(node->chunk, key, data);
@@ -970,8 +972,8 @@ bool LockFreeTree::InsertToChunk(LockFreeElement *node, short int key, LockFreeE
 bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
     while (!DecCount(node)) {
         bool result;
-        Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
-        if (chunk == nullptr) {
+        node = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
+        if (node == nullptr) {
             return result;
         }
     }
@@ -990,8 +992,8 @@ bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
             if (isFrozen(findResult.cur.next->next)) {
                 IncCount(node);
                 bool result;
-                Chunk *chunk = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
-                if (chunk == nullptr) {
+                node = Freeze(node, key, combine(EMPTY, nullptr), combine(EMPTY, nullptr), TT_DELETE, &result);
+                if (node == nullptr) {
                     return result;
                 }
                 return DeleteInChunk(node, key);
@@ -1004,7 +1006,7 @@ bool LockFreeTree::DeleteInChunk(LockFreeElement *node, short int key) {
             MarkFrozen(findResult.next);
         }
         if (CAS(findResult.prev, findResult.cur, findResult.next)) {
-            RetireEntry(findResult.next.next);
+            RetireEntry(findResult.cur.next);
         }
         else {
             Find(node->chunk, key, &findResult);
@@ -1061,14 +1063,13 @@ void LockFreeTree::addRootSons(LockFreeElement *root, short int sepKey1, LockFre
  * ссылку на первую и вторую запись соотвественно
  * Если рассматривать список как упорядочный
  */
-int LockFreeTree::getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt) {
+int LockFreeTree::getEntNum(Chunk *chunk, Entry **firstEnt, Entry **secondEnt) {
     int counter = 0;
     Entry *current = chunk->getHead()->getNext();
-    firstEnt = current;
-    secondEnt = nullptr;
+    *firstEnt = current;
     while (current != nullptr) {
         if (counter == 1) {
-            secondEnt = current;
+            *secondEnt = current;
         }
         counter++;
         current = current->getNext();
@@ -1247,30 +1248,31 @@ short int LockFreeTree::mergeToTwoNodes(LockFreeElement *oldNode, LockFreeElemen
                     break;
             }
 
-            current = current->getNext();
         }
-        Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
-        unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
-        switch (insertResult) {
-            case IC_SUCCESS_THIS: {
-                IncCount(newNode1);
-                break;
+        else {
+            Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
+            unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
+            switch (insertResult) {
+                case IC_SUCCESS_THIS: {
+                    IncCount(newNode1);
+                    break;
+                }
+                case IC_SUCCESS_OTHER: {
+                    break;
+                }
+                case IC_EXISTED: {
+                    ClearEntry(newNode1, tmp);
+                    break;
+                }
+                default:
+                    break;
             }
-            case IC_SUCCESS_OTHER: {
-                break;
-            }
-            case IC_EXISTED: {
-                ClearEntry(newNode1, tmp);
-                break;
-            }
-            default:
-                break;
         }
 
         current = current->getNext();
     }
 
-    current = oldLow->chunk->getHead()->getNext();
+    current = oldHigh->chunk->getHead()->getNext();
     if (oldHigh == mergePartner) {
         Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
         unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
@@ -1380,13 +1382,13 @@ short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElem
                             LockFreeElement *newNode2) {
     Entry *first = nullptr;
     Entry *second = nullptr;
-    int entNum = getEntNum(oldNode->chunk, first, second);
-    int sepNum = entNum/2;
+    int entNum = getEntNum(oldNode->chunk, &first, &second);
+    int sepNum = entNum/2 + entNum%2;
     short int sepKey = 0;
 
     Entry *current = oldNode->chunk->getHead()->getNext();
     while (current != nullptr) {
-        if (sepNum >= 0) {
+        if (sepNum > 0) {
             Entry *tmp = AllocateEntry(newNode1->chunk, current->getKey(), current->getData());
             unsigned short int insertResult = InsertEntry(newNode1->chunk, tmp, current->getKey());
             switch (insertResult) {
@@ -1425,7 +1427,7 @@ short int LockFreeTree::splitIntoTwoNodes(LockFreeElement *oldNode, LockFreeElem
             }
         }
 
-        if (sepNum == 0) {
+        if (sepNum == 1) {
             sepKey = current->getKey();
         }
         sepNum--;
@@ -1565,7 +1567,7 @@ void LockFreeTree::IncCount(LockFreeElement *node) {
 bool LockFreeTree::DecCount(LockFreeElement *node) {
     while (true) {
         int counter = node->counter;
-        if (counter == MIN) {
+        if ((counter == MIN) && (node != root)) {
             return false;
         }
         if (CAS(&node->counter, counter, counter - 1)) {

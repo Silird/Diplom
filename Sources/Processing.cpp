@@ -22,11 +22,9 @@ void Processing::start() {
             case 0: {
             }
             case 1: {
-                /*
                 int number = rand() % limit;
-                std::cout << "(" << i << ") Remove " << number << std::endl;
+                //std::cout << "tree->remove(" << number << "); //" << i << std::endl;
                 tree->remove(number);
-                 */
                 break;
             }
             case 2: {
@@ -39,7 +37,7 @@ void Processing::start() {
             }
             default: {
                 short int number = rand() % limit;
-                //std::cout << "(" << i << ") Add " << number << std::endl;
+                //std::cout << "tree->add(" << number << "); //" << i << std::endl;
                 tree->add(number);
                 break;
             }

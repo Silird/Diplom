@@ -147,7 +147,7 @@ private:
      * Обозначение всех входных данных смотри в FreezeRecovery,
      * так как он является логическим продолжением
      */
-    Chunk* Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
+    LockFreeElement* Freeze(LockFreeElement *node, short int key, EntryDataKey expected,
                   EntryDataKey data, unsigned short int tgr, bool *res);
 
     /*
@@ -161,9 +161,9 @@ private:
      * так как в данном случае мы сразу заканчиваем порабощение узла для мёрджа узла)
      * в result записывается успешность всей вставки узла
      */
-    Chunk* FreezeRecovery(LockFreeElement *oldNode, short int key,
+    LockFreeElement* FreezeRecovery(LockFreeElement *oldNode, short int key,
                           EntryDataKey expected, EntryDataKey input,
-                          unsigned short int recovType, LockFreeElement *mergePartner,
+                          unsigned short int recovType,
                           unsigned short int trigger, bool *result);
 
     // те, которые не известны
@@ -226,7 +226,7 @@ private:
      * ссылку на первую и вторую запись соотвественно
      * Если рассматривать список как упорядочный
      */
-    int getEntNum(Chunk *chunk, Entry *firstEnt, Entry *secondEnt);
+    int getEntNum(Chunk *chunk, Entry **firstEnt, Entry **secondEnt);
 
     /*
      * Проверка на то заморожена ли запись

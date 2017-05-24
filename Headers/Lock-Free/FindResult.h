@@ -5,6 +5,7 @@
 
 struct FindResult {
     std::atomic<EntryNext> *prev;
+    EntryNext normalPrev;
     EntryNext cur;
     EntryNext next;
 };

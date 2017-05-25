@@ -7,8 +7,8 @@ LockFreeTree::LockFreeTree(int range) {
     root = Allocate();
     root.load(std::memory_order_relaxed)->setFreezeState(NORMAL);
 
-    LockFreeElement *tmp = root;
-    unsigned short int freeze = tmp->getFreezeState();
+    //LockFreeElement *tmp = root;
+    //unsigned short int freeze = tmp->getFreezeState();
 
     /*
     Entry *entry = new Entry();
@@ -22,6 +22,13 @@ LockFreeTree::LockFreeTree(int range) {
 }
 
 LockFreeTree::~LockFreeTree() {
+    LockFreeElement* tmp;
+    // TODO work
+    /*
+    while ((tmp = nodes.pop())) {
+        delete tmp;
+    }
+     */
     for (int i = 0; i < nodes.size(); i++) {
         delete nodes[i];
     }
@@ -1063,6 +1070,8 @@ EntryDataKey LockFreeTree::combine(short int key, LockFreeElement *node) {
  */
 LockFreeElement* LockFreeTree::Allocate() {
     LockFreeElement *result = new LockFreeElement(MAX);
+    // TODO work
+    //nodes.push(result);
     m.lock();
     nodes.push_back(result);
     m.unlock();

@@ -6,6 +6,7 @@
 #include "../ITree.h"
 #include "LockFreeElement.h"
 #include "FindResult.h"
+#include "LockFreeStack.h"
 
 // recovery Types
 const unsigned short int RT_COPY = 0;
@@ -22,8 +23,10 @@ const unsigned short int TT_NONE = 5;
 
 class LockFreeTree : public virtual ITree {
 private:
+    // TODO work
     std::mutex m;
     std::vector<LockFreeElement*> nodes;
+    //LockFreeStack nodes;
     int MAX, MIN;
     std::atomic<LockFreeElement*> root;
 

@@ -31,10 +31,22 @@ ITree* TreeFactory::getTree() {
     return tree;
 }
 
+LockFreeStack* TreeFactory::getStack() {
+    if (stack == nullptr) {
+        stack = new LockFreeStack();
+    }
+    return stack;
+}
+
 void TreeFactory::clear() {
     if (tree != nullptr) {
         delete tree;
         tree = nullptr;
+    }
+
+    if (stack != nullptr) {
+        delete stack;
+        stack = nullptr;
     }
 
     if (instance != nullptr) {

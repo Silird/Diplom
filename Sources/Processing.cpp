@@ -4,6 +4,7 @@
 
 #include "../Headers/Processing.h"
 #include "../Headers/TreeFactory.h"
+#include "../Headers/Lock-Free/LockFreeStack.h"
 
 using  namespace std;
 
@@ -22,11 +23,9 @@ void Processing::start() {
             case 0: {
             }
             case 1: {
-                /*
-                int number = rand() % limit;
+                short int number = rand() % limit;
                 //std::cout << "tree->remove(" << number << "); //" << i << std::endl;
                 tree->remove(number);
-                 */
                 break;
 
             }

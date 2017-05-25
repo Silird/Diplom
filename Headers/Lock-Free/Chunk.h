@@ -7,6 +7,7 @@
 const unsigned short int IC_SUCCESS_THIS = 0;
 const unsigned short int IC_SUCCESS_OTHER = 1;
 const unsigned short int IC_EXISTED = 2;
+const unsigned short int IC_FREEZED = 3;
 
 struct Chunk {
     std::atomic<EntryNext> head;

@@ -2,6 +2,7 @@
 #define DIPLOM_LOCKFREETREE_H
 
 #include <sudo_plugin.h>
+#include <mutex>
 #include "../ITree.h"
 #include "LockFreeElement.h"
 #include "FindResult.h"
@@ -21,6 +22,7 @@ const unsigned short int TT_NONE = 5;
 
 class LockFreeTree : public virtual ITree {
 private:
+    std::mutex m;
     std::vector<LockFreeElement*> nodes;
     int MAX, MIN;
     std::atomic<LockFreeElement*> root;
@@ -197,7 +199,7 @@ private:
     /*
      * Удаление в данном чанке записи с данным ключом
      */
-    bool DeleteInChunk(LockFreeElement *node, short int key);
+    bool DeleteInChunk(LockFreeElement *node, short int key, LockFreeElement *data);
 
     /*
      * Выдаёт максимальный ключ в списке

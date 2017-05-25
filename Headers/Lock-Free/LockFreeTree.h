@@ -23,10 +23,7 @@ const unsigned short int TT_NONE = 5;
 
 class LockFreeTree : public virtual ITree {
 private:
-    // TODO work
-    std::mutex m;
-    std::vector<LockFreeElement*> nodes;
-    //LockFreeStack nodes;
+    LockFreeStack nodes;
     int MAX, MIN;
     std::atomic<LockFreeElement*> root;
 
@@ -183,11 +180,6 @@ private:
      * Сделана структура FindResult, которая содержит результаты
      */
     bool Find(Chunk *chunk, short int key, FindResult *findResult);
-
-    /*
-     * Возврат нормального указателя * вместо **
-     */
-    Entry* EntPtr(std::atomic<EntryNext> *entry);
 
     /*
      * Поиск в данном чанке записи с ключом key

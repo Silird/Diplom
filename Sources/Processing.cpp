@@ -23,6 +23,7 @@ void Processing::start() {
             case 0: {
             }
             case 1: {
+
                 short int number = rand() % limit;
                 //std::cout << "tree->remove(" << number << "); //" << i << std::endl;
                 tree->remove(number);
